@@ -1,25 +1,28 @@
-
 import re
 import spacy
 
 nlp = spacy.load("en_core_web_sm")
 
-aadhaar_pattern = r"\b\d{4}\s\d{4}\s\d{4}\b"
-pan_pattern = r"\b[A-Z]{5}[0-9]{4}[A-Z]\b"
-phone_pattern = r"\b[6-9]\d{9}\b"
-email_pattern = r"\b[\w\.-]+@[\w\.-]+\.\w+\b"
-
 def detect_pii(text):
-    results = []
+    pii_list = []
 
-    results += re.findall(aadhaar_pattern, text)
-    results += re.findall(pan_pattern, text)
-    results += re.findall(phone_pattern, text)
-    results += re.findall(email_pattern, text)
+    # Regex detection
+    patterns = {
+        "AADHAAR": r"\b\d{4}\s\d{4}\s\d{4}\b",
+        "PAN": r"\b[A-Z]{5}[0-9]{4}[A-Z]\b",
+        "PHONE": r"\b[6-9]\d{9}\b",
+        "EMAIL": r"\b[\w\.-]+@[\w\.-]+\.\w+\b"
+    }
 
+    for pii_type, pattern in patterns.items():
+        matches = re.findall(pattern, text)
+        for match in matches:
+            pii_list.append({"type": pii_type, "value": match})
+
+    # NER detection
     doc = nlp(text)
     for ent in doc.ents:
-        if ent.label_ in ["PERSON", "GPE", "ORG"]:
-            results.append(ent.text)
+        if ent.label_ == "PERSON":
+            pii_list.append({"type": "PERSON", "value": ent.text})
 
-    return list(set(results))
+    return pii_list

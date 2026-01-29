@@ -1,18 +1,16 @@
-import os
 from fastapi import FastAPI, UploadFile
-import shutil
+import shutil, os
 from ocr import extract_text
 from pii_detector import detect_pii
 from redaction import redact_text
 
 app = FastAPI()
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs("uploads", exist_ok=True)
 
 @app.post("/process/")
 async def process_file(file: UploadFile):
-    path = f"{UPLOAD_FOLDER}/{file.filename}"
+    path = f"uploads/{file.filename}"
 
     with open(path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -21,4 +19,8 @@ async def process_file(file: UploadFile):
     pii_data = detect_pii(text)
     redacted_text = redact_text(text, pii_data)
 
-    return {"redacted_text": redacted_text}
+    return {
+        "total_pii_detected": len(pii_data),
+        "detected_types": list(set([p["type"] for p in pii_data])),
+        "redacted_text": redacted_text
+    }

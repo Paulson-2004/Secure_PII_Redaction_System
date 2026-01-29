@@ -10,3 +10,4 @@ mysql-connector-python
 reportlab
 python-docx
 cryptography
+opencv-python
