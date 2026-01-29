@@ -1,3 +1,5 @@
+from pdf_generator import generate_redacted_pdf
+from fastapi.responses import FileResponse
 from fastapi import FastAPI, UploadFile
 import shutil, os
 from ocr import extract_text
@@ -10,6 +12,7 @@ os.makedirs("uploads", exist_ok=True)
 
 @app.post("/process/")
 async def process_file(file: UploadFile):
+
     path = f"uploads/{file.filename}"
 
     with open(path, "wb") as buffer:
@@ -19,8 +22,16 @@ async def process_file(file: UploadFile):
     pii_data = detect_pii(text)
     redacted_text = redact_text(text, pii_data)
 
+    if path.lower().endswith(".pdf"):
+        output_path = generate_redacted_pdf(redacted_text)
+        return FileResponse(
+            output_path,
+            media_type="application/pdf",
+            filename="redacted_output.pdf"
+        )
+
     return {
         "total_pii_detected": len(pii_data),
-        "detected_types": list(set([p["type"] for p in pii_data])),
+        "detected_types": list(set([item["type"] for item in pii_data])),
         "redacted_text": redacted_text
     }
