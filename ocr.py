@@ -3,6 +3,8 @@ from PIL import Image
 from pdf2image import convert_from_path
 import os
 
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
 def extract_text(path):
     ext = os.path.splitext(path)[1].lower()
 
