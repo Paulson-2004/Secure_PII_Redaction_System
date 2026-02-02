@@ -1,56 +1,46 @@
 import pytesseract
-from PIL import Image
-from pdf2image import convert_from_path
+from pytesseract import Output
 import cv2
+import numpy as np
+from pdf2image import convert_from_path
+from PIL import Image
 import os
 
-# 🔹 Set Tesseract path (Windows only)
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+def preprocess_image(image_path):
+    img = cv2.imread(image_path)
 
-def extract_text(path):
-    """
-    Extracts text from TXT, PDF, and Image files.
-    Includes light preprocessing for better OCR accuracy.
-    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    ext = os.path.splitext(path)[1].lower()
+    # Noise removal
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # ----------------------------
-    # TEXT FILE
-    # ----------------------------
-    if ext == ".txt":
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
+    # Thresholding
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
 
-    # ----------------------------
-    # PDF FILE
-    # ----------------------------
-    elif ext == ".pdf":
-        pages = convert_from_path(path)
-        text = ""
-        for page in pages:
-            text += pytesseract.image_to_string(page, config="--oem 3 --psm 6")
-        return text
-    # ----------------------------
-    # IMAGE FILE
-    # ----------------------------
-    elif ext in [".png", ".jpg", ".jpeg"]:
-        img = cv2.imread(path)
+    return thresh
 
-        # Light preprocessing (safe)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+def extract_text_and_boxes(image_path):
+    image = cv2.imread(image_path)
 
-        text = pytesseract.image_to_string(
-            gray,
-            config="--oem 3 --psm 6"
-        )
+    data = pytesseract.image_to_data(image, output_type=Output.DICT)
 
-        return text
+    words = []
+    n_boxes = len(data['text'])
 
-    # ----------------------------
-    # Unsupported Format
-    # ----------------------------
-    else:
-        return ""
+    for i in range(n_boxes):
+        word = data['text'][i]
+        if word.strip() != "":
+            words.append({
+                "text": word,
+                "x": data['left'][i],
+                "y": data['top'][i],
+                "w": data['width'][i],
+                "h": data['height'][i]
+            })
+
+    full_text = " ".join([w["text"] for w in words])
+
+    return full_text, words
