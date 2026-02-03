@@ -1,5 +1,0 @@
-Name: Paulson J
-Aadhaar: 1234 5678 9012
-PAN: ABCDE1234F
-Phone: 9876543210
-Email: paulson@gmail.com

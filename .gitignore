@@ -1,0 +1,6 @@
+backend/uploads/
+backend/outputs/
+backend/.venv/
+backend/venv/
+android-app/.gradle/
+android-app/**/build/
