@@ -1,0 +1,49 @@
+<svg width="1280" height="360" viewBox="0 0 1280 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PII Fullstack Redaction Platform banner">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1200" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="0.52" stop-color="#0B3B59"/>
+      <stop offset="1" stop-color="#14532D"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="220" y1="42" x2="1040" y2="338" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#34D399" stop-opacity="0.25"/>
+    </linearGradient>
+    <filter id="blur" x="0" y="0" width="1280" height="360" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="360" rx="22" fill="url(#bg)"/>
+
+  <g filter="url(#blur)">
+    <circle cx="180" cy="82" r="74" fill="#22D3EE" fill-opacity="0.24"/>
+    <circle cx="1160" cy="312" r="112" fill="#34D399" fill-opacity="0.2"/>
+  </g>
+
+  <path d="M190 320C350 214 520 266 648 212C756 166 866 86 1060 124" stroke="url(#accent)" stroke-width="6" stroke-linecap="round"/>
+
+  <rect x="84" y="64" width="190" height="38" rx="19" fill="#0EA5E9" fill-opacity="0.18" stroke="#67E8F9" stroke-opacity="0.52"/>
+  <text x="104" y="88" fill="#D1FAE5" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">FULLSTACK AI</text>
+
+  <text x="84" y="156" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="800">
+    PII Fullstack Redaction Platform
+  </text>
+  <text x="84" y="196" fill="#BFDBFE" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="500">
+    Flutter + Flask + OCR + NER + Policy-Aware Redaction
+  </text>
+
+  <g transform="translate(84 238)">
+    <rect width="124" height="34" rx="17" fill="#1D4ED8" fill-opacity="0.28" stroke="#93C5FD" stroke-opacity="0.6"/>
+    <text x="28" y="22" fill="#E0F2FE" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">Flutter</text>
+
+    <rect x="140" width="108" height="34" rx="17" fill="#0F766E" fill-opacity="0.3" stroke="#5EEAD4" stroke-opacity="0.55"/>
+    <text x="174" y="22" fill="#CCFBF1" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">Flask</text>
+
+    <rect x="264" width="112" height="34" rx="17" fill="#1D4ED8" fill-opacity="0.22" stroke="#93C5FD" stroke-opacity="0.45"/>
+    <text x="298" y="22" fill="#DBEAFE" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">MySQL</text>
+
+    <rect x="392" width="122" height="34" rx="17" fill="#14532D" fill-opacity="0.34" stroke="#86EFAC" stroke-opacity="0.5"/>
+    <text x="434" y="22" fill="#DCFCE7" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">AI OCR</text>
+  </g>
+</svg>
