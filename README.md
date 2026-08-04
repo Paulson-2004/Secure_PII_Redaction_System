@@ -2,12 +2,12 @@
 
 ![PII Fullstack Banner](.github/assets/banner.svg)
 
-[![GitHub Stars](https://img.shields.io/github/stars/Da-ya7/PII_FULLSTACK?style=for-the-badge&logo=github)](https://github.com/Da-ya7/PII_FULLSTACK/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/Da-ya7/PII_FULLSTACK?style=for-the-badge&logo=github)](https://github.com/Da-ya7/PII_FULLSTACK/network/members)
-[![GitHub Issues](https://img.shields.io/github/issues/Da-ya7/PII_FULLSTACK?style=for-the-badge&logo=github)](https://github.com/Da-ya7/PII_FULLSTACK/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/Da-ya7/PII_FULLSTACK?style=for-the-badge&logo=git)](https://github.com/Da-ya7/PII_FULLSTACK/commits/main)
+[![GitHub Stars](https://img.shields.io/github/stars/Paulson-2004/Secure_PII_Redaction_System?style=for-the-badge&logo=github)](https://github.com/Paulson-2004/Secure_PII_Redaction_System/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/Paulson-2004/Secure_PII_Redaction_System?style=for-the-badge&logo=github)](https://github.com/Paulson-2004/Secure_PII_Redaction_System/network/members)
+[![GitHub Issues](https://img.shields.io/github/issues/Paulson-2004/Secure_PII_Redaction_System?style=for-the-badge&logo=github)](https://github.com/Paulson-2004/Secure_PII_Redaction_System/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/Paulson-2004/Secure_PII_Redaction_System?style=for-the-badge&logo=git)](https://Paulson-2004/Secure_PII_Redaction_System/commits/main)
 
-[![GitHub Repo](https://img.shields.io/badge/repo-PII__FULLSTACK-181717?logo=github)](https://github.com/Da-ya7/PII_FULLSTACK)
+[![GitHub Repo](https://img.shields.io/badge/repo-Secure_PII_Redaction_System-181717?logo=github)](https://github.com/Paulson-2004/Secure_PII_Redaction_System)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
@@ -26,7 +26,7 @@ Production-style fullstack system for detecting and redacting Personally Identif
 ## Repository Structure
 
 ```text
-PII_FULLSTACK/
+Secure_PII_Redaction_System/
 ├─ PII/                     # Main application
 │  ├─ lib/                  # Flutter app (UI + state + services)
 │  ├─ modules/              # AI pipeline modules (OCR, regex, NER, hybrid, RAG, redaction)
@@ -63,8 +63,8 @@ Flask Backend (app.py)
 ### 1. Clone
 
 ```bash
-git clone https://github.com/Da-ya7/PII_FULLSTACK.git
-cd PII_FULLSTACK/PII
+git clone https://github.com/Paulson-2004/Secure_PII_Redaction_System.git
+cd Secure_PII_Redaction_System/PII
 ```
 
 ### 2. Backend Setup
