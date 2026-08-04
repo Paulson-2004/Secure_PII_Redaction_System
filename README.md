@@ -129,6 +129,23 @@ http://localhost:5080
 - AI/NLP: Tesseract OCR, OpenCV, SpaCy, sentence-transformers, FAISS
 - Data: MySQL
 
+## 📸 Screenshots
+
+Home Page
+<img width="582" height="327" alt="Picture2" src="https://github.com/user-attachments/assets/f012d76d-01e7-4482-8408-3535a0e3bb79" />
+
+Document Upload Page
+<img width="595" height="334" alt="Picture3" src="https://github.com/user-attachments/assets/d613abcb-a94e-47c1-abeb-2f767e9400a8" />
+
+Processing & Redaction Output
+<img width="1323" height="596" alt="Picture4" src="https://github.com/user-attachments/assets/f5c2253c-c890-4788-85b3-1f0d750215e9" />
+
+Document Comparison
+<img width="1291" height="602" alt="Picture5" src="https://github.com/user-attachments/assets/7c2b93f4-0322-4198-a9d5-cc9714b55cf8" />
+
+AI Detection Statistics
+<img width="1278" height="718" alt="Picture6" src="https://github.com/user-attachments/assets/1a9debc0-d6f2-4676-8874-d06d155287e5" />
+
 ## Documentation
 
 - App-level README: [PII/README.md](PII/README.md)
