@@ -42,20 +42,21 @@ Secure_PII_Redaction_System/
 ## System Architecture
 
 ```text
-Flutter Client
-	|
-	| HTTP API
-	v
-Flask Backend (app.py)
-	|
-	+--> OCR Engine (Tesseract + OpenCV)
-	+--> Regex Detector
-	+--> NER Detector (SpaCy)
-	+--> Hybrid Fusion Engine
-	+--> Policy Decision Engine (RAG/FAISS fallback-aware)
-	+--> Redaction Engine (text + image)
-	|
-	+--> MySQL (users, auth, audit logs)
+Flutter Client (Web & Mobile, Material 3)
+	│
+	│ HTTP API (Bearer Token / X-Auth-Token)
+	▼
+Flask REST Backend (app.py)
+	│
+	├──> Database Layer (MySQL Connection Pool + SQLite Fallback privlock.db)
+	│
+	└──> AI Redaction Pipeline:
+	     ├──> OCR Engine (Single-pass Tesseract + OpenCV + PyMuPDF)
+	     ├──> Regex Detector (Precompiled + Verhoeff & Luhn Checksums)
+	     ├──> NER Detector (SpaCy en_core_web_sm + Administrative Blacklist)
+	     ├──> Hybrid Fusion Engine (Semantic Type Compatibility Matrix)
+	     ├──> Policy Decision Engine (15 Regulations + Dense/TF-IDF Cosine Retrieval)
+	     └──> Redaction Engine (Sequence-Aware Visual Masking + Descending Slicing)
 ```
 
 ## Quick Start
@@ -112,22 +113,30 @@ http://localhost:5080
 
 ## Core Features
 
-- Secure user registration/login.
-- Document upload and processing from Flutter UI.
-- OCR extraction with bounding boxes.
-- Structured PII detection via regex patterns.
-- Contextual PII detection via NER.
-- Hybrid confidence-aware fusion.
-- Policy-driven action (full redact, partial mask, keep).
-- Downloadable redacted results.
-- Audit history for processed files.
+- **Authentication & Tenant Isolation**: bcrypt password hashing, token validation, token revocation on logout, and user-isolated document access.
+- **Resilient Database Layer**: Thread-safe MySQL connection pooling (`MySQLConnectionPool`) with an automatic, zero-config SQLite fallback (`privlock.db`) for offline development and academic evaluation.
+- **Single-Pass Document OCR**: Optimized image preprocessing and line reconstruction via Tesseract with support for PDF and text files. (Achieved 49.0% latency reduction in the local benchmark using the specified test image and 5-run average).
+- **High-Precision PII Detection**:
+  - Pre-compiled regex patterns with mathematical **Verhoeff ($D_5$) checksum** for Aadhaar and **Luhn modulus-10 checksum** for payment cards.
+  - Contextual NER via SpaCy with administrative header/label suppression dictionaries.
+  - Semantic hybrid fusion with type compatibility matrix and conflict resolution.
+- **Regulatory Policy Decision Engine**: Codified knowledge base of 15 statutory regulations (DPDP Act 2023, Aadhaar Act 2016 §29, IT Act 2000 §43A, PCI-DSS v4.0) with dense vector search and embedded TF-IDF cosine similarity fallback.
+- **Accurate Redaction Engine**: Sequence-aware n-gram bounding box token matching preventing visual over-redaction, paired with descending start-offset text slicing.
+- **Audit Logging**: Structured document processing history and system security events viewable in the Flutter UI.
 
 ## Tech Stack
 
-- Frontend: Flutter, Provider, Material 3
-- Backend: Flask, Flask-CORS, bcrypt
-- AI/NLP: Tesseract OCR, OpenCV, SpaCy, sentence-transformers, FAISS
-- Data: MySQL
+- **Frontend**: Flutter (v3.x), Dart, Provider, Material 3
+- **Backend**: Python (3.10+), Flask, Flask-CORS, bcrypt
+- **AI & NLP**: Tesseract OCR, OpenCV, PyMuPDF, SpaCy (`en_core_web_sm`), sentence-transformers (optional), FAISS (optional), TF-IDF Cosine Retrieval (embedded fallback)
+- **Data**: MySQL 8.x (primary pooled) / SQLite 3 (embedded fallback)
+
+## Verified Quality & Benchmarks
+
+- **Backend Automated Tests**: 34 tests passing across unit, security, and integration suites (`python -m unittest discover tests`).
+- **Flutter Quality**: `flutter analyze lib` reports 0 issues; all widget tests passing.
+- **Web Build**: Fully compiles to production web bundle (`flutter build web`).
+- **OCR Latency Reduction**: 49.0% reduction in local controlled benchmark (1089.1 ms dual-pass vs 555.8 ms single-pass, 5-run average).
 
 ## 📸 Screenshots
 

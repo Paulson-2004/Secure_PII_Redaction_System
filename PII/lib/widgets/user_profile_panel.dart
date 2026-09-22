@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../screens/login_screen.dart';
+import 'change_password_dialog.dart';
 
 class UserProfilePanel extends StatelessWidget {
   const UserProfilePanel({super.key});
@@ -127,7 +128,7 @@ class UserProfilePanel extends StatelessWidget {
                 label: 'Change Password',
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Show change password dialog
+                  ChangePasswordDialog.show(context);
                 },
               ),
 

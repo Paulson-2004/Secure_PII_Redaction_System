@@ -1,31 +1,38 @@
 # Running Guide
 
-This project has two parts:
-- Flutter frontend in `D:\PII\PII`
-- Flask backend in `D:\PII\PII`
+This repository contains:
+- **Flutter frontend** (Mobile & Web) in `PII/`
+- **Flask REST API backend** with AI Redaction Pipeline in `PII/`
 
 ## Prerequisites
 
 - Python 3.10+
-- Flutter SDK
-- MySQL Server running locally
-- Tesseract OCR installed on Windows
+- Flutter SDK (3.x+)
+- MySQL Server (Optional: If MySQL is not running, the backend automatically activates an embedded SQLite fallback database `privlock.db`)
+- Tesseract OCR (Windows: standard path `C:\Program Files\Tesseract-OCR\tesseract.exe` or configured via `TESSERACT_CMD` in `.env`)
 
 ## Backend Setup
 
 1. Open terminal 1.
-2. Run:
+2. Navigate to `PII`:
 
 ```bash
-cd /d D:\PII\PII
+cd PII
 python -m venv .venv
+# On Windows:
 .\.venv\Scripts\activate
+# On Linux/macOS:
+# source .venv/bin/activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-3. Make sure database credentials in `.env` are correct.  
-   (Fixed: this is `.env`, not `PII\.env`)
+3. Configure environment:
+```bash
+copy .env.example .env
+```
+*(If MySQL is running locally, ensure credentials in `.env` match. If offline, the backend seamlessly falls back to local SQLite).*
+
 4. Start backend:
 
 ```bash
@@ -41,11 +48,10 @@ Health check:
 ## Frontend Setup (Web)
 
 1. Open terminal 2.
-2. Run:
+2. Navigate to `PII`:
 
 ```bash
-cd /d D:\PII\PII
-flutter clean
+cd PII
 flutter pub get
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
 ```

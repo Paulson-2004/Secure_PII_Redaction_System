@@ -303,7 +303,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       drawer: AppDrawer(
         currentRoute: 'dashboard',
         onMenuItemSelected: (menuItem) {
-          // Handle menu item selection if needed
+          if (menuItem == 'upload') {
+            _showFileSourceSheet();
+          }
         },
       ),
       body: SingleChildScrollView(

@@ -18,14 +18,24 @@ class AuditLog {
   });
 
   factory AuditLog.fromJson(Map<String, dynamic> json) {
+    final filename = json['filename'] ??
+        json['original_filename'] ??
+        json['action'] ??
+        'Document';
+    final docType = json['document_type'] ?? json['doc_type'] ?? 'general';
+    final piiCount = (json['pii_count'] as num?)?.toInt() ?? 0;
+    final action = json['action_taken'] ?? json['status'] ?? 'PROCESSED';
+    final procTime = (json['processing_time'] as num?)?.toDouble() ?? 0.0;
+    final createdAt = json['created_at']?.toString() ?? '';
+
     return AuditLog(
-      id: json['id'] ?? 0,
-      filename: json['filename'] ?? '',
-      documentType: json['document_type'] ?? 'unknown',
-      piiCount: json['pii_count'] ?? 0,
-      actionTaken: json['action_taken'] ?? 'REDACTED',
-      processingTime: (json['processing_time'] as num?)?.toDouble() ?? 0.0,
-      createdAt: json['created_at'] ?? '',
+      id: json['id'] is num ? (json['id'] as num).toInt() : 0,
+      filename: filename.toString(),
+      documentType: docType.toString(),
+      piiCount: piiCount,
+      actionTaken: action.toString().toUpperCase(),
+      processingTime: procTime,
+      createdAt: createdAt,
     );
   }
 }

@@ -1,24 +1,41 @@
 # Testing Guide
 
-Use this checklist to verify the app end to end.
+Use this checklist and test suite to verify the application end-to-end.
 
 ## Automated Checks
 
-Run these from `D:\PII\PII`:
+### 1. Flutter Static Analysis & Unit Tests
+Run from the `PII/` directory:
 
 ```bash
+cd PII
 flutter analyze
 flutter test
 ```
 
-Backend smoke test:
+### 2. Backend Automated Test Suite
+Run 34 comprehensive backend unit, security, and end-to-end pipeline tests:
+
+```bash
+cd PII
+python -m unittest discover tests
+```
+
+*Modules verified by automated tests:*
+- `tests/test_regex_detector.py`: Verhoeff Aadhaar validation, Luhn credit card validation, PAN, IFSC, phone, email patterns.
+- `tests/test_hybrid_fusion.py`: Multi-engine fusion, semantic entity compatibility, bounding box synchronization.
+- `tests/test_redaction_engine.py`: Sequence-aware image redaction, non-destructive offset slicing, partial masking.
+- `tests/test_rag_engine.py`: Regulatory retrieval across 15 frameworks (DPDP Act 2023, Aadhaar Act 2016, IT Act, PCI-DSS) with TF-IDF fallback.
+- `tests/test_api_security.py`: JWT auth, password hashing, SQL injection defenses, path traversal protection, CORS.
+- `tests/test_end_to_end_pipeline.py`: Full end-to-end lifecycle from registration to document upload, hybrid redaction, audit logging, and download.
+
+### 3. Backend Smoke Test & Health Check
 
 ```bash
 python app.py
 ```
 
-Health check:
-
+Health check verification:
 ```bash
 curl http://127.0.0.1:5000/api/health
 ```

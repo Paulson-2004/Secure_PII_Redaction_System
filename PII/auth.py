@@ -54,23 +54,25 @@ def create_user(username, email, password):
 def save_pin_code(user_id, pin):
     """Save or update PIN code for a user"""
     hashed_pin = hash_pin(pin)
-    sql = """
-    INSERT INTO user_security (user_id, pin_code)
-    VALUES (%s, %s)
-    ON DUPLICATE KEY UPDATE pin_code = %s, updated_at = NOW()
-    """
-    result = db.execute(sql, (user_id, hashed_pin, hashed_pin))
+    existing = get_user_security(user_id)
+    if existing:
+        sql = "UPDATE user_security SET pin_code = %s, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s"
+        result = db.execute(sql, (hashed_pin, user_id))
+    else:
+        sql = "INSERT INTO user_security (user_id, pin_code) VALUES (%s, %s)"
+        result = db.execute(sql, (user_id, hashed_pin))
     return result is not None
 
 
 def save_fingerprint(user_id, fingerprint_data):
     """Save or update fingerprint data for a user"""
-    sql = """
-    INSERT INTO user_security (user_id, fingerprint_data, is_fingerprint_enabled)
-    VALUES (%s, %s, TRUE)
-    ON DUPLICATE KEY UPDATE fingerprint_data = %s, is_fingerprint_enabled = TRUE, updated_at = NOW()
-    """
-    result = db.execute(sql, (user_id, fingerprint_data, fingerprint_data))
+    existing = get_user_security(user_id)
+    if existing:
+        sql = "UPDATE user_security SET fingerprint_data = %s, is_fingerprint_enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s"
+        result = db.execute(sql, (fingerprint_data, user_id))
+    else:
+        sql = "INSERT INTO user_security (user_id, fingerprint_data, is_fingerprint_enabled) VALUES (%s, %s, 1)"
+        result = db.execute(sql, (user_id, fingerprint_data))
     return result is not None
 
 

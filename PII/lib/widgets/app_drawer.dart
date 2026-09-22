@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../screens/login_screen.dart';
 import '../screens/audit_logs_screen.dart';
+import 'change_password_dialog.dart';
 
 class AppDrawer extends StatefulWidget {
   final Function(String) onMenuItemSelected;
@@ -157,8 +158,8 @@ class _AppDrawerState extends State<AppDrawer> {
               routeName: 'change_password',
               isSelected: widget.currentRoute == 'change_password',
               onTap: () {
-                widget.onMenuItemSelected('change_password');
                 Navigator.pop(context);
+                ChangePasswordDialog.show(context);
               },
             ),
 

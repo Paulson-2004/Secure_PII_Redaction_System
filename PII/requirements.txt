@@ -11,3 +11,4 @@ numpy==2.1.2
 spacy==3.8.11
 sentence-transformers==5.2.3
 faiss-cpu==1.13.2
+PyMuPDF>=1.23.0

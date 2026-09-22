@@ -31,8 +31,8 @@ PII/
 ## Prerequisites
 
 - Python 3.10+
-- Flutter SDK
-- MySQL 8+
+- Flutter SDK (3.x+)
+- MySQL 8+ (Optional: an embedded SQLite fallback privlock.db is automatically activated if MySQL is offline)
 - Tesseract OCR installed and accessible
 
 ## Setup

@@ -18,23 +18,33 @@ def _env(*names, default=None):
 
 class Config:
     """Base configuration"""
-    SECRET_KEY = _env('SECRET_KEY', default='your-secret-key-change-in-production')
+    SECRET_KEY = _env('SECRET_KEY', default='dev-insecure-secret-key-change-in-production')
     SESSION_TYPE = 'filesystem'
-    
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = _env('SESSION_COOKIE_SECURE', default='false').lower() in ('true', '1')
+    PERMANENT_SESSION_LIFETIME = int(_env('SESSION_LIFETIME_SECONDS', default=7 * 86400))
+    AUTH_TOKEN_TTL_HOURS = int(_env('AUTH_TOKEN_TTL_HOURS', default=24))
+
     # Database
     MYSQL_HOST = _env('MYSQL_HOST', 'DB_HOST', default='127.0.0.1')
+    MYSQL_PORT = int(_env('MYSQL_PORT', 'DB_PORT', default=3306))
     MYSQL_USER = _env('MYSQL_USER', 'DB_USER', default='root')
     MYSQL_PASSWORD = _env('MYSQL_PASSWORD', 'DB_PASSWORD', default='')
     MYSQL_DB = _env('MYSQL_DB', 'DB_NAME', default='pii_redaction_db')
     MYSQL_CURSORCLASS = 'DictCursor'
-    
-    # Tesseract OCR Path (Windows)
-    TESSERACT_CMD = _env('TESSERACT_CMD', default=r'C:\Program Files\Tesseract-OCR\tesseract.exe')
-    
+    MYSQL_POOL_SIZE = int(_env('MYSQL_POOL_SIZE', default=5))
+
+    # Tesseract OCR Path (Windows/Linux/macOS)
+    TESSERACT_CMD = _env(
+        'TESSERACT_CMD',
+        default=r'C:\Program Files\Tesseract-OCR\tesseract.exe' if os.name == 'nt' else '/usr/bin/tesseract'
+    )
+
     # Upload settings for AI modules
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-    REDACTED_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads', 'redacted')
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'pdf', 'gif', 'docx', 'txt'}
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+    REDACTED_FOLDER = os.path.join(BASE_DIR, 'uploads', 'redacted')
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'pdf', 'txt'}
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
 
 
@@ -54,7 +64,9 @@ class TestingConfig(Config):
     """Testing configuration"""
     DEBUG = True
     TESTING = True
-    MYSQL_DB = 'privlock_test'
+    MYSQL_DB = _env('MYSQL_TEST_DB', default='pii_redaction_test_db')
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'test_uploads')
+    REDACTED_FOLDER = os.path.join(BASE_DIR, 'test_uploads', 'redacted')
 
 
 config = {

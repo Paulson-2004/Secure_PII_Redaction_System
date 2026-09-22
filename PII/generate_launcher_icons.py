@@ -1,8 +1,10 @@
-from PIL import Image
 import os
+from PIL import Image
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Path to the source logo
-source_logo = r'C:\Users\HP\OneDrive\Desktop\privlock\assets\images\privlock_logo.png'
+source_logo = os.path.join(BASE_DIR, 'assets', 'images', 'privlock_logo.png')
 
 # Android mipmap directories and sizes
 mipmap_dirs = {
@@ -13,6 +15,11 @@ mipmap_dirs = {
     'mipmap-xxxhdpi': 192
 }
 
+# Ensure source logo exists before attempting resize
+if not os.path.exists(source_logo):
+    print(f"Source logo not found at {source_logo}")
+    exit(0)
+
 # Open the source image
 img = Image.open(source_logo)
 
@@ -20,7 +27,7 @@ img = Image.open(source_logo)
 img = img.convert('RGBA')
 
 # Base path for res
-res_path = r'C:\Users\HP\OneDrive\Desktop\privlock\android\app\src\main\res'
+res_path = os.path.join(BASE_DIR, 'android', 'app', 'src', 'main', 'res')
 
 for mipmap, size in mipmap_dirs.items():
     # Resize the image

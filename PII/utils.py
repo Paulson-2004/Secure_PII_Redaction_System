@@ -29,7 +29,22 @@ def log_audit(user_id, action, details=None, status='success'):
     INSERT INTO audit_logs (user_id, action, details, status, created_at)
     VALUES (%s, %s, %s, %s, %s)
     """
-    db.execute(sql, (user_id, action, details, status, datetime.now()))
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    db.execute(sql, (user_id, action, details, status, now_str))
+
+
+def record_document_log(user_id, filename, original_filename, doc_type, status='processed', file_path=None, pii_detected=None):
+    """Save processed document record into documents table for audit trails"""
+    from database import db
+    import json
+
+    sql = """
+    INSERT INTO documents (user_id, filename, original_filename, doc_type, status, file_path, pii_detected, created_at)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    pii_json = json.dumps(pii_detected) if pii_detected is not None else '[]'
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    db.execute(sql, (user_id, filename, original_filename, doc_type, status, file_path or '', pii_json, now_str))
 
 
 def validate_request_data(data, required_fields):

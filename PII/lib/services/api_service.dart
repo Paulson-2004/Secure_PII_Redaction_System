@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'web_download_stub.dart'
   if (dart.library.html) 'web_download_web.dart';
 
@@ -266,33 +267,18 @@ class ApiService {
           return saveDownloadedFile(response.bodyBytes, filename);
         }
 
-        List<String> possiblePaths = [
-          '/storage/emulated/0/Download',
-          '/sdcard/Download',
-          '/data/media/0/Download',
-        ];
-
-        for (String pathStr in possiblePaths) {
-          try {
-            final dir = Directory(pathStr);
-            if (await dir.exists()) {
-              final File file = File('$pathStr/$filename');
-              await file.writeAsBytes(response.bodyBytes);
-              return true;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        final appDir = Directory('/data/data');
+        Directory? dir;
         try {
-          final File file = File('${appDir.path}/$filename');
-          await file.writeAsBytes(response.bodyBytes);
-          return true;
-        } catch (e) {
-          return false;
-        }
+          // Attempt standard downloads directory first
+          dir = await getDownloadsDirectory();
+        } catch (_) {}
+
+        // Fallback to documents directory
+        dir ??= await getApplicationDocumentsDirectory();
+
+        final File file = File('${dir.path}/$filename');
+        await file.writeAsBytes(response.bodyBytes);
+        return true;
       }
       return false;
     } catch (e) {
