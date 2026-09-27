@@ -6,7 +6,7 @@ This repository contains:
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.14.7
 - Flutter SDK (3.x+)
 - MySQL Server (Optional: If MySQL is not running, the backend automatically activates an embedded SQLite fallback database `privlock.db`)
 - Tesseract OCR (Windows: standard path `C:\Program Files\Tesseract-OCR\tesseract.exe` or configured via `TESSERACT_CMD` in `.env`)

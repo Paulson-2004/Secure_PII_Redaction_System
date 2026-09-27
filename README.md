@@ -9,7 +9,7 @@
 
 [![GitHub Repo](https://img.shields.io/badge/repo-Secure_PII_Redaction_System-181717?logo=github)](https://github.com/Paulson-2004/Secure_PII_Redaction_System)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.14.7-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Flask](https://img.shields.io/badge/Flask-Backend-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -35,6 +35,9 @@ Secure_PII_Redaction_System/
 │  ├─ pubspec.yaml          # Flutter dependencies
 │  ├─ RUNNING_GUIDE.md
 │  └─ TESTING_GUIDE.md
+├─ docs/                    # Documentation
+├─ scripts/                 # Utility scripts and shutdown hook
+├─ run_privlock.bat         # Single-click application launcher
 ├─ README.md                # This file
 └─ LICENSE
 ```
@@ -59,7 +62,21 @@ Flask REST Backend (app.py)
 	     └──> Redaction Engine (Sequence-Aware Visual Masking + Descending Slicing)
 ```
 
-## Quick Start
+## Quick Start (Single-Click Launcher)
+
+For a fully automated startup experience on Windows, simply double-click:
+**`run_privlock.bat`**
+
+This script will:
+1. Verify Python 3.14.7 and Flutter prerequisites.
+2. Automatically create a virtual environment (`PII/venv`).
+3. Install dependencies from `requirements.txt`.
+4. Start the Flask backend and wait for readiness.
+5. Launch the Flutter Web client in Chrome.
+
+To shut down cleanly without leaving background processes running, double-click **`scripts/stop_privlock.bat`**.
+
+## Manual Setup
 
 ### 1. Clone
 
@@ -71,9 +88,10 @@ cd Secure_PII_Redaction_System/PII
 ### 2. Backend Setup
 
 ```bash
-python -m venv .venv
+# Must use Python 3.14.7
+python -m venv venv
 # Windows
-.venv\Scripts\activate
+venv\Scripts\activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```

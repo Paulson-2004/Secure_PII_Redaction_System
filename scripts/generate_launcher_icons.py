@@ -1,7 +1,7 @@
 import os
 from PIL import Image
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'PII')
 
 # Path to the source logo
 source_logo = os.path.join(BASE_DIR, 'assets', 'images', 'privlock_logo.png')

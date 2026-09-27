@@ -1,14 +1,16 @@
 from PIL import Image, ImageDraw
 import os
 
-OUTPUT_ASSET = 'assets/logo.png'
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'PII')
+OUTPUT_ASSET = os.path.join(BASE_DIR, 'assets/logo.png')
 OUTPUT_SIZES = {
-    'android/app/src/main/res/mipmap-mdpi/ic_launcher.png': 48,
-    'android/app/src/main/res/mipmap-hdpi/ic_launcher.png': 72,
-    'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png': 96,
-    'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png': 144,
-    'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png': 192,
+    os.path.join(BASE_DIR, 'android/app/src/main/res/mipmap-mdpi/ic_launcher.png'): 48,
+    os.path.join(BASE_DIR, 'android/app/src/main/res/mipmap-hdpi/ic_launcher.png'): 72,
+    os.path.join(BASE_DIR, 'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png'): 96,
+    os.path.join(BASE_DIR, 'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png'): 144,
+    os.path.join(BASE_DIR, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png'): 192,
 }
+
 
 BACKGROUND_COLOR = (255, 255, 255, 0)
 LEFT_COLOR = (20, 48, 92, 255)
@@ -91,7 +93,7 @@ def save_image(path, image):
 
 
 def main():
-    os.makedirs('assets', exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'assets'), exist_ok=True)
     asset_img = create_logo_image(512)
     save_image(OUTPUT_ASSET, asset_img)
 

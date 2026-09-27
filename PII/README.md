@@ -2,7 +2,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-Client-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Flask](https://img.shields.io/badge/Flask-API-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.14.7-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 
 This folder contains the complete app implementation:
@@ -30,7 +30,7 @@ PII/
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.14.7 (Mandatory)
 - Flutter SDK (3.x+)
 - MySQL 8+ (Optional: an embedded SQLite fallback privlock.db is automatically activated if MySQL is offline)
 - Tesseract OCR installed and accessible
@@ -48,9 +48,9 @@ Update `.env` values for your machine.
 ### 2. Install Backend Dependencies
 
 ```bash
-python -m venv .venv
+python -m venv venv
 # Windows
-.venv\Scripts\activate
+venv\Scripts\activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
