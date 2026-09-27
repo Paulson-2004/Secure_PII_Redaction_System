@@ -2,55 +2,78 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-Client-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Flask](https://img.shields.io/badge/Flask-API-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Python](https://img.shields.io/badge/Python-3.14.7-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B%20%7C%203.14.7%20Verified-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 
-This folder contains the complete app implementation:
+This directory contains the core application implementation:
 
-- Flutter frontend for authentication, upload, result visualization, and audit logs.
-- Flask backend that orchestrates OCR, PII detection, policy decisions, and redaction.
-- AI modules for regex, NER, hybrid fusion, and policy-aware redaction decisions.
+- **Flutter Client**: Cross-platform frontend for authentication, document upload, redaction visualization, and audit trail management.
+- **Flask REST API**: Backend server orchestrating OCR, PII detection, regulatory policy retrieval and decisioning, and document redaction.
+- **AI Redaction Pipeline**: Modular engines for single-pass OCR, checksum-validated regex, spaCy NER, semantic hybrid fusion, regulatory policy retrieval/decisioning, and bounding-box/offset redaction.
 
 ## Folder Overview
 
 ```text
 PII/
-├─ lib/                     # Flutter client
-├─ modules/                 # AI engines and redaction pipeline
-├─ app.py                   # Flask API server
-├─ auth.py                  # Authentication logic
-├─ database.py              # DB connection and helpers
-├─ config.py                # Environment-driven configuration
-├─ requirements.txt         # Backend dependencies
-├─ pubspec.yaml             # Flutter dependencies
-├─ schema.sql               # Database schema
-├─ RUNNING_GUIDE.md
-└─ TESTING_GUIDE.md
+├── app.py                  # Flask REST API server entry point
+├── auth.py                 # Authentication, bcrypt hashing, and session management
+├── config.py               # Central environment configuration loader
+├── database.py             # MySQL connection pool with SQLite fallback
+├── schema.sql              # Idempotent baseline MySQL schema
+├── utils.py                # Security sanitizers and path normalization
+├── requirements.txt        # Backend dependencies (Python 3.11+ supported, 3.14.7 verified)
+├── pubspec.yaml            # Flutter project specification
+├── pubspec.lock            # Locked Dart dependencies
+├── analysis_options.yaml   # Flutter strict static analysis configuration
+├── Dockerfile              # Production container specification
+├── docker-compose.yml      # Local MySQL 8.0 orchestration stack
+├── README.md               # App-level technical guide (this file)
+├── RUNNING_GUIDE.md        # Comprehensive execution instructions
+├── TESTING_GUIDE.md        # Complete testing and verification manual
+├── assets/                 # App branding, icons, and shield graphics
+├── lib/                    # Flutter Dart source code (UI, state, services)
+├── modules/                # AI redaction pipeline
+│   ├── ocr_engine.py       # Tesseract OCR & OpenCV preprocessing
+│   ├── regex_detector.py   # Pattern detection with Verhoeff/Luhn checksums
+│   ├── ner_detector.py     # SpaCy contextual entity recognition
+│   ├── hybrid_engine.py    # Semantic fusion & conflict resolution
+│   ├── rag_decision_engine.py # Regulatory policy retrieval & decision engine
+│   └── redaction_engine.py # Precision bounding box & text slicing
+├── test/                   # Flutter widget test suite
+├── tests/                  # Backend unit, security, and E2E test suites
+├── web/                    # Flutter Web index and PWA configuration
+├── android/                # Android native platform files
+└── windows/                # Windows desktop runner
 ```
 
 ## Prerequisites
 
-- Python 3.14.7 (Mandatory)
-- Flutter SDK (3.x+)
-- MySQL 8+ (Optional: an embedded SQLite fallback privlock.db is automatically activated if MySQL is offline)
-- Tesseract OCR installed and accessible
+- **Python**: Python 3.11+ supported (Verified development/test baseline: Python 3.14.7)
+- **Flutter SDK**: 3.x+
+- **Database**: MySQL 8.x (Optional: If MySQL is offline, the backend automatically falls back to an embedded SQLite database `privlock.db`)
+- **Tesseract OCR**: Installed and accessible (default path `C:\Program Files\Tesseract-OCR\tesseract.exe` or configured via `TESSERACT_CMD` in `.env`)
+- **PyMuPDF**: Modern `pymupdf` library for PDF rendering
 
-## Setup
+## Setup Instructions
 
-### 1. Configure Backend Environment
+### 1. Configure Environment
 
 ```bash
 copy .env.example .env
 ```
 
-Update `.env` values for your machine.
+Update `.env` with your local database credentials. If MySQL is not configured, the backend seamlessly operates using the embedded SQLite fallback.
 
 ### 2. Install Backend Dependencies
 
 ```bash
+# Ensure Python 3.11+ is active (verified on Python 3.14.7)
 python -m venv venv
-# Windows
+
+# Windows Activation
 venv\Scripts\activate
+
+# Install Dependencies
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
@@ -67,52 +90,50 @@ flutter pub get
 python app.py
 ```
 
-Health check:
-
+Health check endpoint:
 ```text
 http://127.0.0.1:5000/api/health
 ```
 
-### 5. Run Frontend
+### 5. Run Flutter Web Client
 
 ```bash
-flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
+flutter run -d edge --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
 ```
+*(PrivLock AI is browser-agnostic: use `-d edge`, `-d chrome`, or access the URL in any modern browser including Microsoft Edge, Google Chrome, Mozilla Firefox, or Apple Safari).*
 
 ### 6. Run on Android Mobile
 
 For an Android emulator:
-
 ```bash
 flutter run -d android
 ```
 
-For a physical phone, start the backend on a network-accessible host and pass that URL:
-
+For a physical device on the same local network:
 ```bash
 flutter run -d android --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
 ```
 
-If you want an installable build:
-
+Release APK generation:
 ```bash
 flutter build apk --release --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
 ```
 
 ## API Summary
 
-- `POST /login` and `POST /register` for account flow.
-- `POST /api/process` for upload and PII redaction.
-- `GET /api/health` for service health and AI module status.
-- `GET /audit-logs` for processing history.
+- `POST /login` and `POST /register`: User authentication and JWT/session management.
+- `POST /api/process`: Document upload, AI detection, policy evaluation, and redacted file generation.
+- `GET /api/health`: Health diagnostics, database connectivity, and AI module status.
+- `GET /audit-logs`: Tenant-isolated document processing history.
+- `GET /download/<filename>`: Secure path-validated download of redacted documents.
 
-## Development Guides
+## Guides & Documentation
 
-- [RUNNING_GUIDE.md](RUNNING_GUIDE.md)
-- [TESTING_GUIDE.md](TESTING_GUIDE.md)
+- [RUNNING_GUIDE.md](RUNNING_GUIDE.md): Detailed local execution instructions.
+- [TESTING_GUIDE.md](TESTING_GUIDE.md): Full regression and test suite procedures.
 
-## Notes
+## Operational Notes
 
-- Client service layer is implemented in [lib/services/api_service.dart](lib/services/api_service.dart).
-- The mobile app can talk to the Flask backend directly; a physical device needs the backend host IP, not `localhost`.
-- Runtime output folders (uploads/redacted) and local env files are git-ignored.
+- Client service communication is centralized in [lib/services/api_service.dart](lib/services/api_service.dart).
+- Mobile devices connect to the host IP rather than `localhost`.
+- Generated runtime directories (`uploads/`, `uploads/redacted/`, `build/`, and `venv/`) are excluded from version control via `.gitignore`.

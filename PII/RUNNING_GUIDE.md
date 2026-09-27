@@ -1,104 +1,134 @@
-# Running Guide
+# Running Guide — PrivLock AI
 
 This repository contains:
-- **Flutter frontend** (Mobile & Web) in `PII/`
-- **Flask REST API backend** with AI Redaction Pipeline in `PII/`
+- **Flutter Frontend** (Web & Mobile) in `PII/`
+- **Flask REST API Backend** with AI Redaction Pipeline in `PII/`
 
-## Prerequisites
+---
 
-- Python 3.14.7
-- Flutter SDK (3.x+)
-- MySQL Server (Optional: If MySQL is not running, the backend automatically activates an embedded SQLite fallback database `privlock.db`)
-- Tesseract OCR (Windows: standard path `C:\Program Files\Tesseract-OCR\tesseract.exe` or configured via `TESSERACT_CMD` in `.env`)
+## Method A: Recommended Windows Single-Click Launcher
 
-## Backend Setup
+For the simplest and fastest startup on Windows:
 
-1. Open terminal 1.
-2. Navigate to `PII`:
+1. Navigate to the repository root directory:
+   `Secure_PII_Redaction_System/`
+2. Double-click:
+   **`run_privlock.bat`**
 
-```bash
-cd PII
-python -m venv .venv
-# On Windows:
-.\.venv\Scripts\activate
-# On Linux/macOS:
-# source .venv/bin/activate
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-```
+The launcher automatically:
+- Validates the installation of **Python 3.11+** (verified on **Python 3.14.7**) and **Flutter SDK**.
+- Creates or detects the virtual environment (`PII/venv`).
+- Automatically installs dependencies if first run, or skips installation if the environment is already prepared.
+- Starts the Flask backend in a separate dedicated terminal window.
+- Polls `http://127.0.0.1:5000/api/health` until the backend is fully initialized.
+- Launches the Flutter Web frontend in **Microsoft Edge** or **Google Chrome** (accessible from any modern browser: Chrome, Edge, Firefox, Safari).
 
-3. Configure environment:
-```bash
-copy .env.example .env
-```
-*(If MySQL is running locally, ensure credentials in `.env` match. If offline, the backend seamlessly falls back to local SQLite).*
+### Graceful Shutdown
+To cleanly shut down both the backend and frontend processes without leaving background tasks running:
+- Double-click **`scripts/stop_privlock.bat`**.
 
-4. Start backend:
+---
 
-```bash
-python app.py
-```
+## Method B: Manual Development Setup
 
-Backend URL:
-- `http://127.0.0.1:5000`
+### 1. Prerequisites
 
-Health check:
-- `http://127.0.0.1:5000/api/health`
+- **Python**: Python 3.11 or higher (Verified development/test environment: Python 3.14.7)
+- **Flutter SDK**: 3.x+
+- **Database**: MySQL Server 8.x (Optional: If MySQL is not running, the backend automatically activates an embedded SQLite fallback database `privlock.db`)
+- **Tesseract OCR**: Installed at `C:\Program Files\Tesseract-OCR\tesseract.exe` or configured via `TESSERACT_CMD` in `.env`
+- **Browser**: Any modern standards-compliant web browser (Microsoft Edge, Google Chrome, Mozilla Firefox, Apple Safari)
 
-## Frontend Setup (Web)
+### 2. Backend Setup
 
-1. Open terminal 2.
-2. Navigate to `PII`:
+1. Open a terminal and navigate to `PII`:
+   ```bash
+   cd PII
+   ```
+2. Create and activate the Python virtual environment (Python 3.11+):
+   ```bash
+   python -m venv venv
 
-```bash
-cd PII
-flutter pub get
-flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
-```
+   # On Windows:
+   venv\Scripts\activate
 
-Frontend URL:
-- `http://localhost:5080`
+   # On Linux/macOS:
+   # source venv/bin/activate
+   ```
+3. Install backend dependencies and spaCy language model:
+   ```bash
+   pip install -r requirements.txt
+   python -m spacy download en_core_web_sm
+   ```
+4. Configure environment:
+   ```bash
+   copy .env.example .env
+   ```
+   *(Ensure credentials match your MySQL server if running. If offline, the backend automatically switches to SQLite `privlock.db`).*
+5. Start the backend:
+   ```bash
+   python app.py
+   ```
+   Backend URLs:
+   - Base API: `http://127.0.0.1:5000`
+   - Health Diagnostic: `http://127.0.0.1:5000/api/health`
 
-## Frontend Setup (Android Mobile)
+### 3. Frontend Setup (Web)
 
-### Android Emulator
+1. Open a second terminal and navigate to `PII`:
+   ```bash
+   cd PII
+   ```
+2. Fetch dependencies:
+   ```bash
+   flutter pub get
+   ```
+3. Launch the web application:
+   ```bash
+   flutter run -d edge --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
+   ```
+   *(PrivLock AI is browser-agnostic. Target `-d edge`, `-d chrome`, or open the URL in any modern browser including Microsoft Edge, Google Chrome, Mozilla Firefox, or Apple Safari).*
 
-Run the app directly:
+   Frontend URL:
+   - `http://localhost:5080`
 
+### 4. Frontend Setup (Android Mobile)
+
+#### Android Emulator
 ```bash
 flutter run -d android
 ```
 
-### Physical Android Phone
+#### Physical Android Device
+1. Connect device via USB or ensure it is on the same local Wi-Fi network.
+2. Ensure the backend is listening on `0.0.0.0` (default in `app.py`).
+3. Launch the app providing your workstation's local IP address:
+   ```bash
+   flutter run -d android --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
+   ```
 
-1. Connect the phone over USB or keep it on the same Wi-Fi network as the backend.
-2. Start the backend on a machine reachable from the phone.
-3. Run:
-
-```bash
-flutter run -d android --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
-```
-
-### Release APK
-
+#### Release APK Build
 ```bash
 flutter build apk --release --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
 ```
 
-## Recommended Run Order
+---
 
-1. Start MySQL.
-2. Start backend and confirm `/api/health` is success.
-3. Start Flutter frontend for web or Android.
-4. Open the web app at `http://localhost:5080`, or install/run the Android build on your phone.
+## Recommended Execution Order
 
-## Browser Notes / White Screen Fix
+1. Start MySQL (if using MySQL; otherwise continue with SQLite fallback).
+2. Start the backend and verify `http://127.0.0.1:5000/api/health` returns `200 OK`.
+3. Start the Flutter frontend for web or Android.
+4. Access the web application at `http://localhost:5080`, or run on mobile.
 
-- Hard refresh: `Ctrl + Shift + R`
-- If still blank:
-  1. Stop Flutter (`Ctrl + C`)
-  2. Run `flutter clean`
-  3. Run frontend command again
-  4. Open a fresh tab at `http://localhost:5080`
-- On web, fingerprint login is disabled (mobile-only plugin).
-- On web, upload/download uses browser-safe byte handling.
+---
+
+## Browser Notes & Troubleshooting
+
+- **Hard Refresh**: Press `Ctrl + Shift + R` if cached assets prevent loading.
+- **Clean Rebuild**:
+  1. Stop Flutter (`Ctrl + C` or `q`).
+  2. Run `flutter clean`.
+  3. Re-run `flutter pub get` and the launch command.
+- **Biometrics on Web**: Fingerprint authentication is automatically disabled on Web (mobile-only plugin) and falls back to PIN authentication.
+- **File Handling**: Upload and download operations use browser-safe raw byte streams for cross-platform compatibility.

@@ -25,7 +25,7 @@ if os.path.exists(tess_path):
     pytesseract.pytesseract.tesseract_cmd = tess_path
 
 try:
-    import fitz  # PyMuPDF
+    import pymupdf  # Modern PyMuPDF API
     PDF_SUPPORT = True
 except ImportError:
     PDF_SUPPORT = False
@@ -43,7 +43,7 @@ def load_document_image(file_path):
     if ext == '.pdf':
         if not PDF_SUPPORT:
             raise ValueError("PDF uploaded but PyMuPDF is not installed")
-        doc = fitz.open(file_path)
+        doc = pymupdf.open(file_path)
         if len(doc) == 0:
             raise ValueError("PDF is empty")
         page = doc[0]

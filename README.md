@@ -9,76 +9,115 @@
 
 [![GitHub Repo](https://img.shields.io/badge/repo-Secure_PII_Redaction_System-181717?logo=github)](https://github.com/Paulson-2004/Secure_PII_Redaction_System)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.14.7-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B%20%7C%203.14.7%20Verified-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Flask](https://img.shields.io/badge/Flask-Backend-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 
-Production-style fullstack system for detecting and redacting Personally Identifiable Information from document images using a hybrid AI pipeline.
+Production-style fullstack system for detecting and redacting Personally Identifiable Information from documents (images, PDFs, and text) using a hybrid AI pipeline.
 
 ## Why This Project
 
-- End-to-end workflow: authentication, upload, detection, decisioning, and redacted output.
-- Multi-stage AI pipeline: OCR + regex + NER + policy-aware decisions.
-- Fullstack delivery: Flutter client and Flask backend in one repository.
-- Audit-focused: redaction results and processing logs are available in the app.
+- **End-to-end workflow**: Authentication, upload, multi-engine detection, policy-driven decisioning, and verified redacted output.
+- **Multi-stage AI pipeline**: Single-pass OCR + checksum-validated regex + contextual spaCy NER + semantic hybrid fusion + regulatory policy decisioning.
+- **Fullstack delivery**: Native Flutter client and Python Flask backend in a single, well-organized repository.
+- **Audit-focused**: Tenant-isolated redaction metrics, detection summaries, and audit logs stored directly in the database.
 
 ## Repository Structure
 
 ```text
 Secure_PII_Redaction_System/
-├─ PII/                     # Main application
-│  ├─ lib/                  # Flutter app (UI + state + services)
-│  ├─ modules/              # AI pipeline modules (OCR, regex, NER, hybrid, RAG, redaction)
-│  ├─ app.py                # Flask backend entry point
-│  ├─ requirements.txt      # Python dependencies
-│  ├─ pubspec.yaml          # Flutter dependencies
-│  ├─ RUNNING_GUIDE.md
-│  └─ TESTING_GUIDE.md
-├─ docs/                    # Documentation
-├─ scripts/                 # Utility scripts and shutdown hook
-├─ run_privlock.bat         # Single-click application launcher
-├─ README.md                # This file
-└─ LICENSE
+├── run_privlock.bat            # Single-click application launcher (Windows)
+├── README.md                   # Project overview & system architecture
+├── .env.example                # Root environment template
+├── .gitignore                  # Workspace-wide git ignore rules
+├── LICENSE                     # MIT License
+├── .github/
+│   └── assets/
+│       └── banner.svg          # Graphical project banner
+├── docs/
+│   └── allinone.md             # Consolidated system architecture guide
+├── scripts/
+│   ├── generate_launcher_icons.py  # Android mipmap icon generator
+│   ├── generate_logo_icons.py      # Brand logo and shield asset generator
+│   └── stop_privlock.bat           # Clean process termination script
+└── PII/                        # Core application root
+    ├── app.py                  # Flask REST API entry point
+    ├── auth.py                 # Token authentication and session control
+    ├── config.py               # Environment configuration loader
+    ├── database.py             # MySQL connection pool with SQLite fallback
+    ├── schema.sql              # MySQL idempotent database schema
+    ├── utils.py                # Security sanitizers and path normalization
+    ├── requirements.txt        # Python backend dependencies (Python 3.11+ supported, 3.14.7 verified)
+    ├── pubspec.yaml            # Flutter project specification
+    ├── pubspec.lock            # Locked Dart dependencies
+    ├── analysis_options.yaml   # Flutter strict static analysis rules
+    ├── Dockerfile              # Containerized backend build specification
+    ├── docker-compose.yml      # Local MySQL 8.0 service definition
+    ├── README.md               # App-level technical documentation
+    ├── RUNNING_GUIDE.md        # Comprehensive execution manual
+    ├── TESTING_GUIDE.md        # Verification and testing manual
+    ├── .env.example            # Backend environment template
+    ├── .gitignore              # Local Python and Flutter ignore rules
+    ├── assets/                 # UI image assets and logos
+    ├── lib/                    # Flutter client source (UI, state, API)
+    ├── modules/                # AI redaction pipeline
+    │   ├── ocr_engine.py       # Tesseract OCR & OpenCV preprocessing
+    │   ├── regex_detector.py   # Pattern detection with Verhoeff/Luhn checksums
+    │   ├── ner_detector.py     # SpaCy contextual entity recognition
+    │   ├── hybrid_engine.py    # Semantic fusion & conflict resolution
+    │   ├── rag_decision_engine.py # Regulatory policy retrieval & decision engine
+    │   └── redaction_engine.py # Precision bounding box & text slicing
+    ├── test/                   # Flutter widget tests
+    ├── tests/                  # Backend unit, security, and E2E test suites
+    ├── web/                    # Flutter Web index and PWA configuration
+    ├── android/                # Android native embedding
+    └── windows/                # Windows native runner
 ```
+
+> [!NOTE]
+> Generated directories (`PII/build/`, `PII/venv/`, `PII/uploads/`, and database cache files like `privlock.db`) are excluded by `.gitignore` to maintain repository hygiene.
 
 ## System Architecture
 
 ```text
 Flutter Client (Web & Mobile, Material 3)
 	│
-	│ HTTP API (Bearer Token / X-Auth-Token)
+	│ HTTP REST API (Bearer Token)
 	▼
 Flask REST Backend (app.py)
 	│
-	├──> Database Layer (MySQL Connection Pool + SQLite Fallback privlock.db)
+	├──> Database Layer:
+	│    ├──> MySQL Connection Pool (MySQLConnectionPool, Primary)
+	│    └──> SQLite Fallback (privlock.db, Automated)
 	│
 	└──> AI Redaction Pipeline:
 	     ├──> OCR Engine (Single-pass Tesseract + OpenCV + PyMuPDF)
 	     ├──> Regex Detector (Precompiled + Verhoeff & Luhn Checksums)
 	     ├──> NER Detector (SpaCy en_core_web_sm + Administrative Blacklist)
 	     ├──> Hybrid Fusion Engine (Semantic Type Compatibility Matrix)
-	     ├──> Policy Decision Engine (15 Regulations + Dense/TF-IDF Cosine Retrieval)
+	     ├──> Regulatory Policy Retrieval & Decision Engine (15 Regulations + Dense/TF-IDF Cosine Retrieval)
 	     └──> Redaction Engine (Sequence-Aware Visual Masking + Descending Slicing)
 ```
 
 ## Quick Start (Single-Click Launcher)
 
-For a fully automated startup experience on Windows, simply double-click:
+For an automated startup experience on Windows, double-click:
 **`run_privlock.bat`**
 
-This script will:
-1. Verify Python 3.14.7 and Flutter prerequisites.
-2. Automatically create a virtual environment (`PII/venv`).
-3. Install dependencies from `requirements.txt`.
-4. Start the Flask backend and wait for readiness.
-5. Launch the Flutter Web client in Chrome.
+This script executes the verified startup flow:
+1. Verifies Python (Python 3.11+ supported, verified on 3.14.7) and Flutter prerequisites.
+2. Automatically creates or activates the virtual environment (`PII/venv`).
+3. Installs dependencies from `requirements.txt` (skipped automatically on subsequent runs if already initialized).
+4. Starts the Flask backend in a separate terminal and polls `http://127.0.0.1:5000/api/health` until ready.
+5. Launches the Flutter Web frontend in your default browser (Microsoft Edge or Google Chrome; accessible from any modern browser: Chrome, Edge, Firefox, Safari).
 
-To shut down cleanly without leaving background processes running, double-click **`scripts/stop_privlock.bat`**.
+To cleanly shut down the backend and frontend without orphaned background processes, run:
+**`scripts/stop_privlock.bat`**
 
 ## Manual Setup
 
-### 1. Clone
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/Paulson-2004/Secure_PII_Redaction_System.git
@@ -88,10 +127,13 @@ cd Secure_PII_Redaction_System/PII
 ### 2. Backend Setup
 
 ```bash
-# Must use Python 3.14.7
+# Python Version: Python 3.11+ supported (Verified development/test environment: Python 3.14.7)
 python -m venv venv
-# Windows
+
+# Activate Virtual Environment (Windows)
 venv\Scripts\activate
+
+# Install Dependencies
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
@@ -102,7 +144,7 @@ python -m spacy download en_core_web_sm
 copy .env.example .env
 ```
 
-Update `.env` with your local configuration values.
+Update `.env` with your local MySQL credentials. If MySQL is offline or unconfigured, the backend automatically switches to local SQLite fallback (`privlock.db`).
 
 ### 4. Start Backend
 
@@ -110,8 +152,7 @@ Update `.env` with your local configuration values.
 python app.py
 ```
 
-Backend health endpoint:
-
+Health check verification:
 ```text
 http://127.0.0.1:5000/api/health
 ```
@@ -120,11 +161,12 @@ http://127.0.0.1:5000/api/health
 
 ```bash
 flutter pub get
-flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
+# Launch on your available web browser (Edge or Chrome):
+flutter run -d edge --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080
 ```
+*(PrivLock AI is browser-agnostic: use `-d edge`, `-d chrome`, or navigate to the web URL in any modern browser including Microsoft Edge, Google Chrome, Mozilla Firefox, or Apple Safari).*
 
 Client URL:
-
 ```text
 http://localhost:5080
 ```
@@ -133,27 +175,28 @@ http://localhost:5080
 
 - **Authentication & Tenant Isolation**: bcrypt password hashing, token validation, token revocation on logout, and user-isolated document access.
 - **Resilient Database Layer**: Thread-safe MySQL connection pooling (`MySQLConnectionPool`) with an automatic, zero-config SQLite fallback (`privlock.db`) for offline development and academic evaluation.
-- **Single-Pass Document OCR**: Optimized image preprocessing and line reconstruction via Tesseract with support for PDF and text files. (Achieved 49.0% latency reduction in the local benchmark using the specified test image and 5-run average).
+- **Single-Pass Document OCR**: Optimized image preprocessing and line reconstruction via Tesseract with PyMuPDF support for PDFs and raw text files. (Achieved 49.0% local controlled OCR latency reduction in benchmark: 1089.1 ms dual-pass vs 555.8 ms single-pass, 5-run average).
 - **High-Precision PII Detection**:
   - Pre-compiled regex patterns with mathematical **Verhoeff ($D_5$) checksum** for Aadhaar and **Luhn modulus-10 checksum** for payment cards.
   - Contextual NER via SpaCy with administrative header/label suppression dictionaries.
   - Semantic hybrid fusion with type compatibility matrix and conflict resolution.
-- **Regulatory Policy Decision Engine**: Codified knowledge base of 15 statutory regulations (DPDP Act 2023, Aadhaar Act 2016 §29, IT Act 2000 §43A, PCI-DSS v4.0) with dense vector search and embedded TF-IDF cosine similarity fallback.
+- **Regulatory Policy Retrieval & Decision Engine**: Codified knowledge base of 15 statutory regulations (DPDP Act 2023, Aadhaar Act 2016 §29, IT Act 2000 §43A, PCI-DSS v4.0) with dense vector retrieval (FAISS) and embedded TF-IDF cosine similarity fallback.
 - **Accurate Redaction Engine**: Sequence-aware n-gram bounding box token matching preventing visual over-redaction, paired with descending start-offset text slicing.
 - **Audit Logging**: Structured document processing history and system security events viewable in the Flutter UI.
 
 ## Tech Stack
 
-- **Frontend**: Flutter (v3.x), Dart, Provider, Material 3
-- **Backend**: Python (3.10+), Flask, Flask-CORS, bcrypt
-- **AI & NLP**: Tesseract OCR, OpenCV, PyMuPDF, SpaCy (`en_core_web_sm`), sentence-transformers (optional), FAISS (optional), TF-IDF Cosine Retrieval (embedded fallback)
-- **Data**: MySQL 8.x (primary pooled) / SQLite 3 (embedded fallback)
+- **Frontend**: Flutter (v3.x), Dart, Provider, Material 3, Cross-Browser Flutter Web (Microsoft Edge, Google Chrome, Mozilla Firefox, Apple Safari) and Android support
+- **Backend**: Python 3.11+ (verified development/test environment: Python 3.14.7), Flask, Flask-CORS, bcrypt
+- **AI & NLP Pipeline**: Tesseract OCR, OpenCV, PyMuPDF, SpaCy (`en_core_web_sm`), sentence-transformers (`all-MiniLM-L6-v2`), FAISS, TF-IDF Cosine Retrieval (embedded fallback)
+- **Data Layer**: MySQL 8.x (primary pooled) / SQLite 3 (`privlock.db`, automated fallback)
 
 ## Verified Quality & Benchmarks
 
-- **Backend Automated Tests**: 34 tests passing across unit, security, and integration suites (`python -m unittest discover tests`).
-- **Flutter Quality**: `flutter analyze lib` reports 0 issues; all widget tests passing.
-- **Web Build**: Fully compiles to production web bundle (`flutter build web`).
+- **Backend Automated Tests**: 34/34 tests passing across unit, security, and integration suites (`python -m unittest discover tests`, verified on Python 3.14.7).
+- **End-to-End Pipeline**: 2/2 pipeline tests passing (`python -m unittest tests.test_end_to_end_pipeline`).
+- **Flutter Code Quality**: `flutter analyze lib` reports 0 issues; all widget tests passing (`flutter test`).
+- **Web Build**: Successfully compiles to production web bundle (`flutter build web --release`).
 - **OCR Latency Reduction**: 49.0% reduction in local controlled benchmark (1089.1 ms dual-pass vs 555.8 ms single-pass, 5-run average).
 
 ## 📸 Screenshots
@@ -175,14 +218,15 @@ AI Detection Statistics
 
 ## Documentation
 
-- App-level README: [PII/README.md](PII/README.md)
-- Runtime guide: [PII/RUNNING_GUIDE.md](PII/RUNNING_GUIDE.md)
-- Testing guide: [PII/TESTING_GUIDE.md](PII/TESTING_GUIDE.md)
+- App-level Technical Guide: [PII/README.md](PII/README.md)
+- Complete Running Guide: [PII/RUNNING_GUIDE.md](PII/RUNNING_GUIDE.md)
+- Verification & Testing Guide: [PII/TESTING_GUIDE.md](PII/TESTING_GUIDE.md)
+- Consolidated Architecture Reference: [docs/allinone.md](docs/allinone.md)
 
 ## Security Notes
 
 - `.env`, local uploads, generated build artifacts, and dataset folders are ignored via `.gitignore`.
-- Use non-production credentials locally and rotate secrets before deployment.
+- Use non-production credentials locally and rotate secrets before production deployment.
 
 ## License
 

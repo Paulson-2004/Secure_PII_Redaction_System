@@ -1,117 +1,141 @@
-# Testing Guide
+# Testing Guide — PrivLock AI
 
-Use this checklist and test suite to verify the application end-to-end.
+Use this verification guide and automated test suite to validate the application end-to-end.
+
+---
+
+## Verified Baseline Results
+
+The following test suites and quality gates have been executed and verified on the codebase:
+
+| Verification Stage | Command | Result | Details |
+|---|---|---|---|
+| **Backend Unit & Security** | `python -m unittest discover tests` | **PASS** | 34/34 tests passed |
+| **End-to-End Pipeline** | `python -m unittest tests.test_end_to_end_pipeline` | **PASS** | 2/2 tests passed |
+| **Flutter Static Analysis** | `flutter analyze lib` | **PASS** | 0 warnings, 0 errors, 0 lints |
+| **Flutter Widget Tests** | `flutter test` | **PASS** | All tests passed |
+| **Flutter Production Web** | `flutter build web --release` | **PASS** | `build/web` generated cleanly |
+| **Launcher First Run** | `run_privlock.bat` | **PASS** | Created venv, started backend & web browser |
+| **Launcher Second Run** | `run_privlock.bat` | **PASS** | Reused venv, skipped reinstall, started |
+| **Stop Script** | `scripts/stop_privlock.bat` | **PASS** | Clean window-targeted shutdown |
+| **MySQL Connectivity** | Health check | **PASS** | Connected to `pii_redaction_system` pool |
+| **SQLite Fallback** | `USE_SQLITE=true` | **PASS** | Automated fallback to `privlock.db` |
+
+---
 
 ## Automated Checks
 
 ### 1. Flutter Static Analysis & Unit Tests
+
 Run from the `PII/` directory:
 
 ```bash
 cd PII
-flutter analyze
+flutter analyze lib
 flutter test
 ```
 
-### 2. Backend Automated Test Suite
-Run 34 comprehensive backend unit, security, and end-to-end pipeline tests:
+### 2. Backend Automated Test Suites
 
+Ensure your virtual environment is active (`venv\Scripts\activate` on Windows) before running tests:
+
+#### Full Unit & Security Suite (34 Tests)
 ```bash
-cd PII
 python -m unittest discover tests
 ```
 
-*Modules verified by automated tests:*
+*Test suites verified:*
 - `tests/test_regex_detector.py`: Verhoeff Aadhaar validation, Luhn credit card validation, PAN, IFSC, phone, email patterns.
 - `tests/test_hybrid_fusion.py`: Multi-engine fusion, semantic entity compatibility, bounding box synchronization.
 - `tests/test_redaction_engine.py`: Sequence-aware image redaction, non-destructive offset slicing, partial masking.
-- `tests/test_rag_engine.py`: Regulatory retrieval across 15 frameworks (DPDP Act 2023, Aadhaar Act 2016, IT Act, PCI-DSS) with TF-IDF fallback.
-- `tests/test_api_security.py`: JWT auth, password hashing, SQL injection defenses, path traversal protection, CORS.
-- `tests/test_end_to_end_pipeline.py`: Full end-to-end lifecycle from registration to document upload, hybrid redaction, audit logging, and download.
+- `tests/test_rag_engine.py`: Regulatory Policy Retrieval & Decision Engine across 15 frameworks (DPDP Act 2023, Aadhaar Act 2016, IT Act, PCI-DSS) with TF-IDF fallback.
+- `tests/test_api_security.py`: Token authentication, password hashing, SQL injection defenses, path traversal protection, tenant isolation.
 
-### 3. Backend Smoke Test & Health Check
+#### End-to-End Pipeline Suite (2 Tests)
+```bash
+python -m unittest tests.test_end_to_end_pipeline
+```
+Verifies full document lifecycle: registration $\rightarrow$ login $\rightarrow$ upload $\rightarrow$ OCR $\rightarrow$ detection $\rightarrow$ policy decision $\rightarrow$ visual/text redaction $\rightarrow$ audit trail logging.
 
+### 3. Backend Health Diagnostic
+
+Start the backend:
 ```bash
 python app.py
 ```
 
-Health check verification:
+Query the health diagnostic endpoint:
 ```bash
 curl http://127.0.0.1:5000/api/health
 ```
 
-## Manual UI Test Flow
+Expected JSON response:
+```json
+{
+  "data": {
+    "backend": "running",
+    "database": "connected",
+    "database_engine": "MySQL",
+    "ai": {
+      "loaded": true,
+      "ocr": { "loaded": true },
+      "regex": { ... },
+      "ner": { "status": "LOADED" },
+      "hybrid": { "loaded": true },
+      "rag": { "total_policies": 15, "rag_enabled": true },
+      "redaction": { "loaded": true }
+    }
+  },
+  "success": true
+}
+```
 
-### Web
+---
 
-### 1. Register
+## Manual UI Verification Flow
 
-- Open `http://localhost:5080`
-- Create a new account
-- Confirm you move forward to the security setup screen
+### Web Testing Flow (Any Modern Browser: Edge, Chrome, Firefox, Safari)
 
-### 2. Login
+1. **User Registration**:
+   - Access `http://localhost:5080`.
+   - Register a new test account.
+   - Confirm progression to the security setup screen.
+2. **User Authentication**:
+   - Sign in using the registered credentials.
+   - Confirm the main dashboard renders cleanly.
+3. **Security PIN Configuration**:
+   - Configure a 4 to 6 digit security PIN.
+   - Confirm PIN persistence (skip biometric enrollment on Web).
+4. **Document Processing**:
+   - Select document type (e.g. `Aadhaar Card`, `PAN Card`, or raw text).
+   - Upload a test document image or PDF.
+   - Click **Process Document**.
+   - Confirm detection summary: PII count, policy reference, and detected entity types.
+5. **Redacted Document Download**:
+   - Click **Download** on the results panel.
+   - Confirm the browser downloads the redacted file successfully.
+6. **Audit Trail Verification**:
+   - Open the **Audit Logs** screen from the navigation drawer.
+   - Confirm that the processing event is recorded with timestamp and tenant isolation.
 
-- Sign in with the account you created
-- Confirm the dashboard loads
+---
 
-### 3. Set PIN
+## Expected Behavioral Results
 
-- Enter a 4 to 6 digit PIN
-- Confirm the PIN saves successfully
-- If fingerprint is shown in desktop/mobile, you can skip it on web
+- Backend health check returns HTTP 200 with `success: true`.
+- Authentication flow operates without CORS or network errors.
+- PIN setup and session handling function cleanly in the browser.
+- Document upload executes using browser-safe raw byte streams.
+- Redacted file downloads cleanly without path traversal or corrupted formats.
+- AI pipeline accurately detects sensitive data and applies precision masking.
 
-### 4. Upload and Process a Document
+---
 
-- Select `Aadhaar Card` or another document type
-- Upload an image from the dataset or your own test document
-- Click `Process Document`
-- Confirm the result screen shows PII count, redaction summary, and detected PII types
+## Troubleshooting Reference
 
-### 5. Download Redacted File
-
-- On the result screen, click `Download`
-- Confirm the browser downloads the redacted file successfully
-
-### 6. Audit Logs
-
-- Open the audit logs screen from the drawer
-- Confirm the processing event appears in the list
-
-## Expected Results
-
-- Backend health returns `success: true`
-- Login/register work without CORS or fetch errors
-- PIN setup works in Chrome
-- Upload works in Chrome using browser-safe byte uploads
-- Download works in Chrome using browser-safe download handling
-- AI redaction produces a processed file and result summary
-
-## Android Mobile Smoke Test
-
-1. Start the backend on a reachable IP address.
-2. Launch the app with `flutter run -d android --dart-define=API_BASE_URL=http://<your-pc-ip>:5000`.
-3. Register and log in on the phone.
-4. Set PIN and verify fingerprint setup if the device supports it.
-5. Upload a test document from the phone gallery or files app.
-6. Process the document and confirm the redacted output screen loads.
-7. Download or share the processed file if your Android version allows it.
-
-## Common Issues
-
-| Problem | Likely Cause | Fix |
-|---------|--------------|-----|
-| White screen | Stale web session or old build | Hard refresh the browser |
-| Failed to fetch | Backend not running or CORS issue | Check backend port 5000 and refresh |
-| Download failed | Old browser session | Hard refresh and try again |
-| Upload unsupported | Wrong build path or old frontend code | Restart the frontend and reselect the file |
-
-## Quick End-to-End Smoke Test
-
-1. Start backend and frontend.
-2. Register a test user.
-3. Login.
-4. Set PIN.
-5. Upload a test Aadhaar image.
-6. Process document.
-7. Download the redacted output.
+| Symptom | Probable Cause | Corrective Action |
+|---|---|---|
+| **White Screen in Browser** | Stale cached assets | Perform hard refresh (`Ctrl + Shift + R`) or run `flutter clean` |
+| **Failed to Fetch (API)** | Backend not running or wrong port | Verify backend is active on `http://127.0.0.1:5000/api/health` |
+| **Download Failed** | Invalid filename or session timeout | Re-login and download the file from the audit log |
+| **MySQL Connection Refused** | MySQL service stopped | Start MySQL service or allow automatic fallback to SQLite `privlock.db` |

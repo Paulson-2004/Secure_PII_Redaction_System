@@ -10,22 +10,34 @@ echo.
 REM 1. Check Prerequisites
 echo [*] Checking prerequisites...
 
-REM Check Python 3.14
-python --version 2>nul | find "3.14.7" >nul
-if %ERRORLEVEL% NEQ 0 (
-    py -3.14 --version 2>nul | find "3.14.7" >nul
-    if !ERRORLEVEL! NEQ 0 (
-        echo [ERROR] Python 3.14.7 is required but not found as default 'python' or 'py -3.14'.
-        echo Please ensure Python 3.14.7 is installed and added to PATH.
-        pause
-        exit /b 1
-    ) else (
-        set PYTHON_CMD=py -3.14
-    )
-) else (
+REM Check Python (Python 3.11+ supported, verified on 3.14.7)
+set PYTHON_CMD=
+python -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
     set PYTHON_CMD=python
+) else (
+    py -3 -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>nul
+    if !ERRORLEVEL! EQU 0 (
+        set PYTHON_CMD=py -3
+    ) else (
+        for %%V in (3.14 3.13 3.12 3.11) do (
+            if not defined PYTHON_CMD (
+                py -%%V -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>nul
+                if !ERRORLEVEL! EQU 0 set PYTHON_CMD=py -%%V
+            )
+        )
+    )
 )
-echo [OK] Python 3.14.7 found.
+
+if not defined PYTHON_CMD (
+    echo [ERROR] Python 3.11 or higher is required ^(verified on Python 3.14.7^).
+    echo Please ensure Python 3.11+ is installed and added to PATH.
+    pause
+    exit /b 1
+)
+
+for /f "tokens=*" %%i in ('!PYTHON_CMD! -c "import sys; print(sys.version.split()[0])"') do set DETECTED_PY_VER=%%i
+echo [OK] Python !DETECTED_PY_VER! found (Python 3.11+ supported, verified on 3.14.7).
 
 REM Check Flutter
 where flutter >nul 2>nul
@@ -46,7 +58,7 @@ cd /d "%~dp0PII"
 echo [*] Checking virtual environment...
 if exist "venv\Scripts\activate.bat" goto VENV_EXISTS
 
-echo [INFO] Creating new virtual environment with Python 3.14.7...
+echo [INFO] Creating new virtual environment with Python !DETECTED_PY_VER!...
 %PYTHON_CMD% -m venv venv
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to create virtual environment.
@@ -99,14 +111,25 @@ goto HEALTH_CHECK
 :BACKEND_READY
 echo.
 REM 4. Launch the Frontend
-echo [*] Starting Flutter Frontend in Chrome...
-start "PrivLock Flutter Frontend" cmd /c "flutter run -d chrome"
+set WEB_DEVICE=edge
+flutter devices 2>nul | findstr /i /c:"edge" >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    set WEB_DEVICE=edge
+)
+flutter devices 2>nul | findstr /i /c:"chrome" >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    set WEB_DEVICE=chrome
+)
+
+echo [*] Starting Flutter Frontend on !WEB_DEVICE!...
+start "PrivLock Flutter Frontend" cmd /c "flutter run -d !WEB_DEVICE! --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080"
 
 echo.
 echo ==============================================================
 echo PrivLock AI has been launched!
 echo - Flask Backend is running in a separate window.
-echo - Flutter Frontend is running in Chrome.
+echo - Flutter Frontend is running on !WEB_DEVICE! (http://localhost:5080).
+echo   (PrivLock AI supports any modern web browser: Edge, Chrome, Firefox, Safari)
 echo.
 echo To gracefully stop the application, run:
 echo    scripts\stop_privlock.bat
