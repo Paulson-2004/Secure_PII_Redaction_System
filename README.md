@@ -1,4 +1,4 @@
-# PII Fullstack Redaction Platform
+# PrivLock AI — Intelligent PII Detection & Redaction System
 
 ![PII Fullstack Banner](.github/assets/banner.svg)
 

@@ -1,4 +1,4 @@
-# PII Application
+# PrivLock AI — Backend & Application Engine
 
 [![Flutter](https://img.shields.io/badge/Flutter-Client-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Flask](https://img.shields.io/badge/Flask-API-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)

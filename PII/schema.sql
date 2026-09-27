@@ -1,8 +1,8 @@
--- PriLock Database Schema for Flask Backend
+-- PrivLock AI Database Schema for Flask Backend
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS pii_redaction_db;
-USE pii_redaction_db;
+CREATE DATABASE IF NOT EXISTS pii_redaction_system;
+USE pii_redaction_system;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

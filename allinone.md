@@ -3,7 +3,7 @@
 ## Database Architecture
 
 The backend supports dual database connectivity:
-1. **Primary**: MySQL database (`pii_redaction_db`) using thread-safe connection pooling (`MySQLConnectionPool`). Credentials are configured via `PII/.env`.
+1. **Primary**: MySQL database (`pii_redaction_system`) using thread-safe connection pooling (`MySQLConnectionPool`). Credentials are configured via `PII/.env`.
 2. **Automated Fallback**: If MySQL is offline, the backend seamlessly activates an embedded SQLite database (`PII/privlock.db`), ensuring zero-friction setup for development, evaluation, and viva presentations.
 
 The canonical schema is defined in [PII/schema.sql](PII/schema.sql).

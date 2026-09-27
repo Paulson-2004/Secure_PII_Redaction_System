@@ -27,13 +27,14 @@ class Config:
     AUTH_TOKEN_TTL_HOURS = int(_env('AUTH_TOKEN_TTL_HOURS', default=24))
 
     # Database
+    USE_SQLITE = _env('USE_SQLITE', default='false').lower() in ('true', '1')
     MYSQL_HOST = _env('MYSQL_HOST', 'DB_HOST', default='127.0.0.1')
     MYSQL_PORT = int(_env('MYSQL_PORT', 'DB_PORT', default=3306))
     MYSQL_USER = _env('MYSQL_USER', 'DB_USER', default='root')
     MYSQL_PASSWORD = _env('MYSQL_PASSWORD', 'DB_PASSWORD', default='')
-    MYSQL_DB = _env('MYSQL_DB', 'DB_NAME', default='pii_redaction_db')
+    MYSQL_DB = _env('MYSQL_DB', 'DB_NAME', default='pii_redaction_system')
     MYSQL_CURSORCLASS = 'DictCursor'
-    MYSQL_POOL_SIZE = int(_env('MYSQL_POOL_SIZE', default=5))
+    MYSQL_POOL_SIZE = int(_env('MYSQL_POOL_SIZE', default=10))
 
     # Tesseract OCR Path (Windows/Linux/macOS)
     TESSERACT_CMD = _env(

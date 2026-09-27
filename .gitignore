@@ -28,6 +28,7 @@ env/
 .env.local
 .env.production
 .env.*
+!.env.example
 
 # ========================
 # IDE / Editor
@@ -105,6 +106,7 @@ PII/PII-DATASET/
 .pub/
 .pub-cache/
 **/build/
+devtools_options.yaml
 
 # ========================
 # Reports / Docs (optional)

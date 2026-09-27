@@ -38,30 +38,120 @@ class Database:
 
     def connect(self):
         """Establish database connection pool (MySQL) or initialize SQLite fallback."""
-        force_sqlite = str(self._cfg('USE_SQLITE', 'false')).lower() in ('true', '1')
+        force_sqlite = str(self._cfg('USE_SQLITE', os.getenv('USE_SQLITE', 'false'))).lower() in ('true', '1')
 
         if not force_sqlite and MYSQL_AVAILABLE:
             try:
                 pool_size = int(self._cfg('MYSQL_POOL_SIZE', 5))
+                host = self._cfg('MYSQL_HOST', '127.0.0.1')
+                port = int(self._cfg('MYSQL_PORT', 3306))
+                user = self._cfg('MYSQL_USER', 'root')
+                password = self._cfg('MYSQL_PASSWORD', '')
+                database = self._cfg('MYSQL_DB', 'pii_redaction_system')
+
+                # Ensure database exists if MySQL user has permission
+                try:
+                    admin_conn = mysql.connector.connect(
+                        host=host,
+                        port=port,
+                        user=user,
+                        password=password
+                    )
+                    admin_cur = admin_conn.cursor()
+                    admin_cur.execute(f"CREATE DATABASE IF NOT EXISTS `{database}`")
+                    admin_cur.close()
+                    admin_conn.close()
+                except Exception as db_err:
+                    logger.debug("Database creation check skipped: %s", db_err)
+
                 self.pool = pooling.MySQLConnectionPool(
                     pool_name="pii_redaction_pool",
                     pool_size=pool_size,
                     pool_reset_session=True,
-                    host=self._cfg('MYSQL_HOST', '127.0.0.1'),
-                    port=int(self._cfg('MYSQL_PORT', 3306)),
-                    user=self._cfg('MYSQL_USER', 'root'),
-                    password=self._cfg('MYSQL_PASSWORD', ''),
-                    database=self._cfg('MYSQL_DB', 'pii_redaction_db'),
+                    host=host,
+                    port=port,
+                    user=user,
+                    password=password,
+                    database=database,
                 )
                 self.use_sqlite = False
                 self._initialized = True
-                logger.info("MySQL connection pool established successfully")
+                self._init_mysql_schema()
+                logger.info("MySQL connection pool established successfully for '%s'", database)
                 return True
             except Exception as e:
                 logger.warning("MySQL connection failed: %s. Initializing SQLite fallback.", e)
 
         # SQLite fallback mode
         return self._init_sqlite()
+
+    def _init_mysql_schema(self):
+        """Ensure all required tables exist in MySQL with proper indexes and constraints."""
+        schema_statements = [
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_username (username),
+                INDEX idx_email (email)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                action VARCHAR(255) NOT NULL,
+                details TEXT,
+                status VARCHAR(50) DEFAULT 'success',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_user_id (user_id),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                filename VARCHAR(255) NOT NULL,
+                original_filename VARCHAR(255) NOT NULL,
+                doc_type VARCHAR(100),
+                status VARCHAR(50) DEFAULT 'processed',
+                file_path VARCHAR(500),
+                pii_detected JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_user_id (user_id),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS user_security (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL UNIQUE,
+                pin_code VARCHAR(255),
+                fingerprint_data LONGTEXT,
+                is_fingerprint_enabled BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        ]
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                for stmt in schema_statements:
+                    cursor.execute(stmt)
+                conn.commit()
+            finally:
+                cursor.close()
+        logger.info("MySQL schema verification completed")
 
     def _init_sqlite(self):
         """Initialize local SQLite database with required schema."""
@@ -143,16 +233,23 @@ class Database:
                 conn.close()
         else:
             conn = None
-            try:
-                conn = self.pool.get_connection()
-                yield conn
-            except Exception:
-                # If pool connection fails, try reconnecting pool once
-                if self.connect() and not self.use_sqlite:
+            max_retries = 10
+            for attempt in range(max_retries):
+                try:
                     conn = self.pool.get_connection()
-                    yield conn
-                else:
-                    raise
+                    break
+                except Exception as e:
+                    if 'pool exhausted' in str(e).lower() and attempt < max_retries - 1:
+                        import time
+                        time.sleep(0.05)
+                        continue
+                    if self.connect() and not self.use_sqlite:
+                        conn = self.pool.get_connection()
+                        break
+                    else:
+                        raise
+            try:
+                yield conn
             finally:
                 if conn and hasattr(conn, 'close'):
                     try:
@@ -174,16 +271,18 @@ class Database:
                     # Translate MySQL %s placeholder to SQLite ?
                     sql_converted = sql.replace('%s', '?')
                     cursor = conn.cursor()
-                    cursor.execute(sql_converted, params)
-                    rows = [dict(row) for row in cursor.fetchall()]
-                    cursor.close()
-                    return rows
+                    try:
+                        cursor.execute(sql_converted, params)
+                        return [dict(row) for row in cursor.fetchall()]
+                    finally:
+                        cursor.close()
                 else:
                     cursor = conn.cursor(dictionary=True)
-                    cursor.execute(sql, params)
-                    rows = cursor.fetchall()
-                    cursor.close()
-                    return rows
+                    try:
+                        cursor.execute(sql, params)
+                        return cursor.fetchall()
+                    finally:
+                        cursor.close()
         except Exception as e:
             logger.error("Database query error: %s [SQL: %s]", e, sql)
             return None
@@ -193,36 +292,39 @@ class Database:
         params = params or ()
         try:
             with self.get_connection() as conn:
-                if self.use_sqlite:
-                    sql_converted = sql.replace('%s', '?')
-                    # SQLite ON DUPLICATE KEY UPDATE replacement
-                    if 'ON DUPLICATE KEY UPDATE' in sql_converted.upper():
-                        # Handle user_security upsert for SQLite
-                        if 'user_security' in sql_converted:
-                            sql_converted = """
-                            INSERT INTO user_security (user_id, pin_code, fingerprint_data, is_fingerprint_enabled)
-                            VALUES (?, ?, ?, ?)
-                            ON CONFLICT(user_id) DO UPDATE SET
-                                pin_code = COALESCE(excluded.pin_code, user_security.pin_code),
-                                fingerprint_data = COALESCE(excluded.fingerprint_data, user_security.fingerprint_data),
-                                is_fingerprint_enabled = COALESCE(excluded.is_fingerprint_enabled, user_security.is_fingerprint_enabled),
-                                updated_at = CURRENT_TIMESTAMP
-                            """
-                    cursor = conn.cursor()
-                    cursor.execute(sql_converted, params)
+                cursor = conn.cursor()
+                try:
+                    if self.use_sqlite:
+                        sql_converted = sql.replace('%s', '?')
+                        # SQLite ON DUPLICATE KEY UPDATE replacement
+                        if 'ON DUPLICATE KEY UPDATE' in sql_converted.upper():
+                            # Handle user_security upsert for SQLite
+                            if 'user_security' in sql_converted:
+                                sql_converted = """
+                                INSERT INTO user_security (user_id, pin_code, fingerprint_data, is_fingerprint_enabled)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(user_id) DO UPDATE SET
+                                    pin_code = COALESCE(excluded.pin_code, user_security.pin_code),
+                                    fingerprint_data = COALESCE(excluded.fingerprint_data, user_security.fingerprint_data),
+                                    is_fingerprint_enabled = COALESCE(excluded.is_fingerprint_enabled, user_security.is_fingerprint_enabled),
+                                    updated_at = CURRENT_TIMESTAMP
+                                """
+                        cursor.execute(sql_converted, params)
+                    else:
+                        cursor.execute(sql, params)
                     conn.commit()
                     affected = cursor.rowcount
                     last_id = cursor.lastrowid
-                    cursor.close()
                     return {'affected': affected, 'last_id': last_id}
-                else:
-                    cursor = conn.cursor()
-                    cursor.execute(sql, params)
-                    conn.commit()
-                    affected = cursor.rowcount
-                    last_id = cursor.lastrowid
+                except Exception:
+                    if hasattr(conn, 'rollback'):
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                    raise
+                finally:
                     cursor.close()
-                    return {'affected': affected, 'last_id': last_id}
         except Exception as e:
             logger.error("Database execute error: %s [SQL: %s]", e, sql)
             return None
