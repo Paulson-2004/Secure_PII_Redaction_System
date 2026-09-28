@@ -105,7 +105,7 @@ Access the client at `http://localhost:5080`.
 All quality gates are verified on the codebase:
 
 ```bash
-# 1. Full Backend Unit & Security Suite (34 tests)
+# 1. Full Backend Unit & Security Suite (35 tests)
 cd PII
 python -m unittest discover tests
 
@@ -121,3 +121,25 @@ flutter test
 # 5. Production Web Bundle Compilation
 flutter build web --release
 ```
+
+---
+
+## 6. Cloud Deployment Architecture (Vercel + Render Free Tier)
+
+PrivLock AI is architected for zero-infrastructure-cost production deployment:
+
+### Topology
+```text
+[ Web Browser ]
+      │
+      ├──> Vercel Edge CDN (Static Flutter Web SPA, vercel.json)
+      │
+      └──> Render Web Service (Flask REST API, Gunicorn, render.yaml)
+                │
+                └──> In-Memory / File SQLite Database (USE_SQLITE=true)
+```
+
+- **Stateless Authentication**: Uses cryptographic tokens (`X-Auth-Token` / `Authorization: Bearer <token>`) passed via HTTP headers, eliminating third-party cookie blocking between distinct subdomains (`vercel.app` vs `onrender.com`).
+- **Path Traversal Shielding**: Strict path validation via `os.path.commonpath` and prefix ownership checks on all download and preview endpoints.
+- **Preview Isolation**: Preview endpoint explicitly refuses to serve unredacted source documents, guaranteeing that raw PII is never exposed across the network.
+- **Static Edge Delivery**: Standard Vercel build runners do not supply the Flutter SDK; Vercel is used for static hosting of the compiled `build/web` artifact with SPA rewrites managed by `vercel.json`.

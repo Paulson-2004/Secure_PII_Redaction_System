@@ -28,6 +28,8 @@ Production-style fullstack system for detecting and redacting Personally Identif
 ```text
 Secure_PII_Redaction_System/
 ├── run_privlock.bat            # Single-click application launcher (Windows)
+├── render.yaml                 # Render Blueprint specification (Backend API)
+├── vercel.json                 # Vercel deployment configuration (Frontend SPA)
 ├── README.md                   # Project overview & system architecture
 ├── .env.example                # Root environment template
 ├── .gitignore                  # Workspace-wide git ignore rules
@@ -52,6 +54,7 @@ Secure_PII_Redaction_System/
     ├── pubspec.yaml            # Flutter project specification
     ├── pubspec.lock            # Locked Dart dependencies
     ├── analysis_options.yaml   # Flutter strict static analysis rules
+    ├── vercel.json             # Vercel routing configuration
     ├── Dockerfile              # Containerized backend build specification
     ├── docker-compose.yml      # Local MySQL 8.0 service definition
     ├── README.md               # App-level technical documentation
@@ -99,6 +102,49 @@ Flask REST Backend (app.py)
 	     ├──> Regulatory Policy Retrieval & Decision Engine (15 Regulations + Dense/TF-IDF Cosine Retrieval)
 	     └──> Redaction Engine (Sequence-Aware Visual Masking + Descending Slicing)
 ```
+
+## 🚀 Cloud Deployment (Free Tier: Vercel + Render)
+
+PrivLock AI is pre-configured for cost-free cloud deployment combining Vercel (Frontend static hosting) and Render (Backend API Web Service):
+
+### 1. Backend Deployment (Render Free Tier)
+- **Repository Setup**: Connect your GitHub repository to [Render](https://render.com/).
+- **Blueprint or Web Service**:
+  - **Option A (Blueprint)**: Select **Blueprints** and point to `render.yaml`.
+  - **Option B (Manual Web Service)**:
+    - **Root Directory**: `PII`
+    - **Runtime**: `Python 3`
+    - **Build Command**: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
+    - **Start Command**: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120`
+    - **Environment Variables**:
+      - `USE_SQLITE`: `true` (enables zero-maintenance embedded SQLite demo database)
+      - `FLASK_ENV`: `production`
+      - `SECRET_KEY`: `<generate-a-random-32-byte-hex-string>`
+      - `CORS_ALLOWED_ORIGINS`: `https://<your-app>.vercel.app,http://localhost:*`
+      - `FRONTEND_URL`: `https://<your-app>.vercel.app`
+
+### 2. Frontend Deployment (Vercel Static Hosting)
+
+> [!IMPORTANT]
+> **Static Hosting Model**: Standard Vercel build environments do not include the Flutter SDK. PrivLock utilizes Vercel as a high-performance **Edge CDN for static hosting** of the compiled Flutter Web bundle (`PII/build/web`), with single-page app (SPA) rewrites and security headers managed by `vercel.json`.
+
+**Option A: Local Build + Vercel CLI (Recommended — Zero CI Configuration)**
+1. Compile the production web bundle locally with your real Render backend URL:
+   ```bash
+   cd PII
+   flutter build web --release --dart-define=API_BASE_URL=https://<your-actual-render-service>.onrender.com
+   ```
+2. Deploy the static artifact directly to production:
+   ```bash
+   npx vercel deploy build/web --prod
+   ```
+
+**Option B: Automated GitHub Actions CI (Optional)**
+For automated deployment on push, set up a GitHub Actions workflow with `subosito/flutter-action` to build the web bundle with your `--dart-define=API_BASE_URL` secret, then deploy `PII/build/web` to Vercel using `amondnet/vercel-action`.
+
+> [!NOTE]
+> - **Render Free Tier Spin-Down**: Free Render web services spin down after 15 minutes of inactivity; the initial request after idle may experience a 30–50 second cold start delay.
+> - **Storage Ephemerality**: Documents processed on Render's free tier are stored on ephemeral local disk and cleaned up on container restarts. For permanent cloud storage, attach a persistent disk or cloud storage bucket.
 
 ## Quick Start (Single-Click Launcher)
 

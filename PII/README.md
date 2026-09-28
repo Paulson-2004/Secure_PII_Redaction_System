@@ -25,6 +25,7 @@ PII/
 ├── pubspec.yaml            # Flutter project specification
 ├── pubspec.lock            # Locked Dart dependencies
 ├── analysis_options.yaml   # Flutter strict static analysis configuration
+├── vercel.json             # Vercel SPA routing and security configuration
 ├── Dockerfile              # Production container specification
 ├── docker-compose.yml      # Local MySQL 8.0 orchestration stack
 ├── README.md               # App-level technical guide (this file)
@@ -125,11 +126,18 @@ flutter build apk --release --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
 - `POST /api/process`: Document upload, AI detection, policy evaluation, and redacted file generation.
 - `GET /api/health`: Health diagnostics, database connectivity, and AI module status.
 - `GET /audit-logs`: Tenant-isolated document processing history.
-- `GET /download/<filename>`: Secure path-validated download of redacted documents.
+- `GET /api/download/<filename>`: Secure path-validated download of redacted documents.
+- `GET /api/preview/<filename>`: Secure path-validated visual/text preview of redacted documents (strict ownership validation; unredacted files rejected).
+
+## Cloud Deployment (Free Tier: Vercel + Render)
+
+PrivLock is architected for free-tier cloud deployment:
+- **Backend**: Render Free Web Service (or Blueprint via `../render.yaml`), running Gunicorn (`gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120`) with `USE_SQLITE=true` and `FLASK_ENV=production`.
+- **Frontend**: Vercel Static Hosting. Because standard Vercel environments lack the Flutter SDK, build the web bundle locally (`flutter build web --release --dart-define=API_BASE_URL=https://<your-actual-render-url>`) and deploy the static artifact directly (`npx vercel deploy build/web --prod`), or configure a GitHub Actions CI workflow to build and push to Vercel. SPA rewrites and caching are managed by `web/vercel.json`.
 
 ## Guides & Documentation
 
-- [RUNNING_GUIDE.md](RUNNING_GUIDE.md): Detailed local execution instructions.
+- [RUNNING_GUIDE.md](RUNNING_GUIDE.md): Detailed local and cloud execution instructions.
 - [TESTING_GUIDE.md](TESTING_GUIDE.md): Full regression and test suite procedures.
 
 ## Operational Notes

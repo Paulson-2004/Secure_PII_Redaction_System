@@ -242,12 +242,46 @@ def redact_image(image, detections, ocr_words):
     return redacted_img
 
 
+def save_redacted_pdf_pages(redacted_images, output_path):
+    """
+    Save multiple redacted BGR images as a multi-page PDF document.
+
+    Args:
+        redacted_images: list of np.ndarray (BGR)
+        output_path: str, path to output .pdf file
+
+    Returns:
+        str: output_path
+    """
+    if not redacted_images:
+        return None
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    from PIL import Image
+    pil_images = [
+        Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        for img in redacted_images
+        if img is not None
+    ]
+    if not pil_images:
+        return None
+    pil_images[0].save(
+        output_path,
+        "PDF",
+        save_all=True,
+        append_images=pil_images[1:]
+    )
+    return output_path
+
+
 def save_redacted_image(redacted_img, output_path):
     """Save redacted image to destination file path."""
     if redacted_img is None:
         return None
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    cv2.imwrite(output_path, redacted_img)
+    if output_path.lower().endswith('.pdf'):
+        return save_redacted_pdf_pages([redacted_img], output_path)
+    else:
+        cv2.imwrite(output_path, redacted_img)
     return output_path
 
 

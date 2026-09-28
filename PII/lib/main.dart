@@ -20,7 +20,7 @@ class PIIRedactionApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => DocumentProvider()),
       ],
       child: MaterialApp(
-        title: 'PII Redaction',
+        title: 'PrivLock',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: const SplashScreen(),

@@ -87,6 +87,15 @@ def create_logo_image(size):
     return img
 
 
+WEB_SIZES = {
+    os.path.join(BASE_DIR, 'web/favicon.png'): 64,
+    os.path.join(BASE_DIR, 'web/icons/Icon-192.png'): 192,
+    os.path.join(BASE_DIR, 'web/icons/Icon-512.png'): 512,
+    os.path.join(BASE_DIR, 'web/icons/Icon-maskable-192.png'): 192,
+    os.path.join(BASE_DIR, 'web/icons/Icon-maskable-512.png'): 512,
+}
+
+
 def save_image(path, image):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     image.save(path, format='PNG')
@@ -100,7 +109,10 @@ def main():
     for path, size in OUTPUT_SIZES.items():
         save_image(path, asset_img.resize((size, size), Image.LANCZOS))
 
-    print(f'Created {OUTPUT_ASSET} and Android launcher icons.')
+    for path, size in WEB_SIZES.items():
+        save_image(path, asset_img.resize((size, size), Image.LANCZOS))
+
+    print(f'Created {OUTPUT_ASSET}, Android launcher icons, and Web icons/favicon.')
 
 
 if __name__ == '__main__':

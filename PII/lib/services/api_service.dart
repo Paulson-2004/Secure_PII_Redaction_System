@@ -287,6 +287,34 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>?> getDocumentPreview(String filename) async {
+    try {
+      final response = await http.get(
+        _buildUri('/api/preview/$filename'),
+        headers: _defaultHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        final contentType = response.headers['content-type'] ?? '';
+        final isImage = contentType.startsWith('image/');
+        final isText = contentType.contains('text/plain');
+
+        return {
+          'success': true,
+          'bytes': response.bodyBytes,
+          'contentType': contentType,
+          'isImage': isImage,
+          'isText': isText,
+          'text': isText ? utf8.decode(response.bodyBytes, allowMalformed: true) : null,
+        };
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Preview fetch error: $e');
+      return null;
+    }
+  }
+
   static Future<List<dynamic>> getAuditLogs() async {
     final response = await http.get(
       _buildUri('/audit-logs'),

@@ -5,6 +5,7 @@ policy decisioning, exact visual/text redaction, and audit trail management.
 """
 
 import os
+import io
 import sys
 import time
 import json
@@ -43,12 +44,17 @@ AUTH_TOKENS = {}
 
 # Import AI modules
 try:
-    from modules.ocr_engine import get_full_text_and_boxes
+    from modules.ocr_engine import get_full_text_and_boxes, get_pdf_pages_data
     from modules.regex_detector import detect_pii_regex, get_pattern_summary
     from modules.ner_detector import detect_pii_ner, get_ner_model_info
     from modules.hybrid_engine import detect_pii_hybrid
     from modules.rag_decision_engine import decide_redaction, get_rag_engine
-    from modules.redaction_engine import process_redaction
+    from modules.redaction_engine import (
+        process_redaction,
+        save_redacted_pdf_pages,
+        redact_image,
+        redact_text
+    )
     AI_MODULES_LOADED = True
     AI_MODULE_SOURCE = os.path.join(BASE_DIR, 'modules')
 except Exception as e:
@@ -105,15 +111,31 @@ app.config.from_object(config.get(env, config['default']))
 # Session & Cookie Security
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = app.config.get('SESSION_COOKIE_SAMESITE', 'Lax')
 app.config['SESSION_COOKIE_SECURE'] = app.config.get('SESSION_COOKIE_SECURE', False)
+
+# Build CORS allowed origins (localhost/127.0.0.1 + optional FRONTEND_URL or CORS_ALLOWED_ORIGINS)
+import re
+cors_origins = [re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$")]
+frontend_url = app.config.get('FRONTEND_URL') or os.getenv('FRONTEND_URL')
+if frontend_url:
+    for u in frontend_url.split(','):
+        u_clean = u.strip().rstrip('/')
+        if u_clean and u_clean not in cors_origins:
+            cors_origins.append(u_clean)
+custom_cors = app.config.get('CORS_ALLOWED_ORIGINS') or os.getenv('CORS_ALLOWED_ORIGINS')
+if custom_cors:
+    for u in custom_cors.split(','):
+        u_clean = u.strip().rstrip('/')
+        if u_clean and u_clean not in cors_origins:
+            cors_origins.append(u_clean)
 
 # Enable CORS for Flutter Web & Mobile clients
 CORS(
     app,
     resources={
         r"/*": {
-            'origins': r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+            'origins': cors_origins,
             'supports_credentials': True,
             'allow_headers': [
                 'Content-Type',
@@ -340,43 +362,148 @@ def process_document():
     try:
         file.save(filepath)
 
-        # Step 1: Document Text & Bounding Box Extraction
-        text_result = get_full_text_and_boxes(filepath)
-        extracted_text = text_result.get('text', '')
-        word_boxes = text_result.get('words', [])
-        original_image = text_result.get('original_image')
-
-        # Step 2: Hybrid PII Detection (Regex + NER)
-        hybrid_result = detect_pii_hybrid(extracted_text)
-        pii_detections = hybrid_result.get('detections', [])
-        detection_stats = hybrid_result.get('stats', {})
-
-        # Step 3: RAG Decision Engine - Apply Policy Redaction Actions
-        try:
-            enriched_detections = decide_redaction(pii_detections)
-            rag_status = get_rag_engine().get_engine_status()
-        except Exception as e:
-            logger.warning("RAG policy decisioning warning: %s", e)
-            enriched_detections = pii_detections
-            rag_status = {'rag_enabled': False, 'error': str(e)}
-
-        # Override decision if user explicitly requested 'mask' or 'blur' action
-        if action in ('mask', 'blur'):
-            for d in enriched_detections:
-                if d.get('decision') != 'KEEP':
-                    d['decision'] = 'PARTIAL_MASK'
-
-        # Step 4: Redaction Engine - Apply Text Masking and Visual Image Redaction
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
         redacted_filename = f"redacted_{filename}"
         redacted_path = os.path.join(redacted_dir, redacted_filename)
 
-        redaction_results = process_redaction(
-            extracted_text,
-            original_image,
-            word_boxes,
-            enriched_detections,
-            redacted_path
-        )
+        if ext == 'pdf':
+            # Multi-page PDF Processing Pipeline:
+            # Process each page sequentially through OCR, detection, policy engine, and redaction
+            pages_data = get_pdf_pages_data(filepath)
+            page_count = len(pages_data)
+
+            all_enriched_detections = []
+            all_raw_detections = []
+            page_redacted_images = []
+            all_redacted_text_parts = []
+            all_extracted_text_parts = []
+
+            total_stats = {
+                'total_detected': 0,
+                'regex_count': 0,
+                'ner_count': 0,
+                'fused_count': 0,
+                'high_confidence_count': 0,
+                'medium_confidence_count': 0,
+                'low_confidence_count': 0,
+                'dedup_removed': 0,
+                'avg_confidence': 0.0,
+            }
+
+            rag_status = {'rag_enabled': True}
+
+            for page_idx, page in enumerate(pages_data):
+                p_text = page['text']
+                p_words = page['words']
+                p_orig_img = page['original_image']
+                all_extracted_text_parts.append(f"--- Page {page_idx + 1} ---\n{p_text}")
+
+                # Hybrid PII Detection on page text
+                p_hybrid = detect_pii_hybrid(p_text)
+                p_detections = p_hybrid.get('detections', [])
+                p_stats = p_hybrid.get('stats', {})
+
+                for k in ('total_detected', 'regex_count', 'ner_count', 'fused_count',
+                          'high_confidence_count', 'medium_confidence_count', 'low_confidence_count',
+                          'dedup_removed'):
+                    total_stats[k] += p_stats.get(k, 0)
+
+                # Policy Engine decision
+                try:
+                    p_enriched = decide_redaction(p_detections)
+                    rag_status = get_rag_engine().get_engine_status()
+                except Exception as e:
+                    logger.warning("Policy decisioning warning on page %d: %s", page_idx + 1, e)
+                    p_enriched = p_detections
+                    rag_status = {'rag_enabled': False, 'error': str(e)}
+
+                if action in ('mask', 'blur'):
+                    for d in p_enriched:
+                        if d.get('decision') != 'KEEP':
+                            d['decision'] = 'PARTIAL_MASK'
+
+                # Annotate detections with 1-indexed page number
+                for d in p_enriched:
+                    d_copy = dict(d)
+                    d_copy['page'] = page_idx + 1
+                    all_enriched_detections.append(d_copy)
+
+                for d in p_detections:
+                    d_copy = dict(d)
+                    d_copy['page'] = page_idx + 1
+                    all_raw_detections.append(d_copy)
+
+                # Visual redaction for this page
+                p_redacted_img = redact_image(p_orig_img, p_enriched, p_words)
+                page_redacted_images.append(p_redacted_img)
+
+                # Text redaction for this page
+                p_redacted_text = redact_text(p_text, p_enriched)
+                all_redacted_text_parts.append(f"--- Page {page_idx + 1} ---\n{p_redacted_text}")
+
+            # Reconstruct multi-page redacted PDF preserving original page count and order
+            save_redacted_pdf_pages(page_redacted_images, redacted_path)
+
+            full_redacted = sum(1 for d in all_enriched_detections if d.get('decision') == 'FULL_REDACT')
+            partial_masked = sum(1 for d in all_enriched_detections if d.get('decision') == 'PARTIAL_MASK')
+            kept = sum(1 for d in all_enriched_detections if d.get('decision') == 'KEEP')
+
+            redaction_results = {
+                'redacted_text': '\n\n'.join(all_redacted_text_parts),
+                'redacted_image_path': redacted_path,
+                'summary': {
+                    'total_pii': len(all_enriched_detections),
+                    'full_redacted': full_redacted,
+                    'partial_masked': partial_masked,
+                    'kept': kept
+                }
+            }
+
+            extracted_text = '\n\n'.join(all_extracted_text_parts)
+            pii_detections = all_raw_detections
+            enriched_detections = all_enriched_detections
+            detection_stats = total_stats
+            if detection_stats.get('total_detected', 0) > 0:
+                detection_stats['avg_confidence'] = round(
+                    sum(d.get('confidence', 0.0) for d in enriched_detections) / len(enriched_detections), 4
+                )
+        else:
+            # Single document (image or text) processing
+            page_count = 1
+            # Step 1: Document Text & Bounding Box Extraction
+            text_result = get_full_text_and_boxes(filepath)
+            extracted_text = text_result.get('text', '')
+            word_boxes = text_result.get('words', [])
+            original_image = text_result.get('original_image')
+
+            # Step 2: Hybrid PII Detection (Regex + NER)
+            hybrid_result = detect_pii_hybrid(extracted_text)
+            pii_detections = hybrid_result.get('detections', [])
+            detection_stats = hybrid_result.get('stats', {})
+
+            # Step 3: RAG Decision Engine - Apply Policy Redaction Actions
+            try:
+                enriched_detections = decide_redaction(pii_detections)
+                rag_status = get_rag_engine().get_engine_status()
+            except Exception as e:
+                logger.warning("RAG policy decisioning warning: %s", e)
+                enriched_detections = pii_detections
+                rag_status = {'rag_enabled': False, 'error': str(e)}
+
+            # Override decision if user explicitly requested 'mask' or 'blur' action
+            if action in ('mask', 'blur'):
+                for d in enriched_detections:
+                    if d.get('decision') != 'KEEP':
+                        d['decision'] = 'PARTIAL_MASK'
+
+            # Step 4: Redaction Engine - Apply Text Masking and Visual Image Redaction
+            redaction_results = process_redaction(
+                extracted_text,
+                original_image,
+                word_boxes,
+                enriched_detections,
+                redacted_path
+            )
 
         elapsed_time = round(time.time() - start_proc_time, 2)
 
@@ -387,7 +514,8 @@ def process_document():
                 'type': d.get('type'),
                 'confidence': d.get('confidence', 0.0),
                 'decision': d.get('decision', 'FULL_REDACT'),
-                'regulation': d.get('regulation', '')
+                'regulation': d.get('regulation', ''),
+                **({'page': d['page']} if 'page' in d else {})
             }
             for d in enriched_detections
         ]
@@ -416,6 +544,7 @@ def process_document():
             'doc_type': doc_type,
             'action': action,
             'status': 'processed',
+            'page_count': page_count,
             'extracted_text_preview': extracted_text[:300] if extracted_text else '',
             'pii_detected': pii_types,
             'pii_details': pii_summary_list,
@@ -480,6 +609,83 @@ def download_document(filename):
 
     log_audit(user_id, 'document_downloaded', f'Downloaded: {clean_filename}')
     return send_file(target_path, as_attachment=True)
+
+
+# ==================== SECURE PREVIEW ROUTE ====================
+
+@app.route('/api/preview/<filename>', methods=['GET'])
+def preview_document(filename):
+    """
+    Secure document preview endpoint with strict path traversal prevention,
+    user ownership isolation, and privacy guarantee:
+    ONLY redacted output artifacts can be previewed (never the original unredacted document).
+    """
+    user_id = _get_current_user_id()
+    if not user_id:
+        return error_response('Unauthorized: Please login first', 401)
+
+    clean_filename = secure_filename(filename)
+    if not clean_filename or clean_filename != filename:
+        return error_response('Invalid filename format', 400)
+
+    # CRITICAL PRIVACY & SECURITY CHECK:
+    # Previews MUST ONLY be served for redacted artifacts belonging to the current user!
+    # Original unredacted uploads ({user_id}_...) are strictly forbidden from preview.
+    allowed_prefix = f"redacted_{user_id}_"
+    if not clean_filename.startswith(allowed_prefix):
+        return error_response('Access denied: Only processed redacted documents can be previewed', 403)
+
+    uploads_dir = os.path.abspath(app.config.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads')))
+    redacted_dir = os.path.abspath(app.config.get('REDACTED_FOLDER', os.path.join(uploads_dir, 'redacted')))
+    target_path = os.path.abspath(os.path.join(redacted_dir, clean_filename))
+
+    # Path traversal validation
+    try:
+        if os.path.commonpath([redacted_dir, target_path]) != redacted_dir:
+            return error_response('Access denied: Invalid file path', 400)
+    except ValueError:
+        return error_response('Access denied: Invalid file path', 400)
+
+    if not os.path.exists(target_path) or not os.path.isfile(target_path):
+        return error_response('Document not found', 404)
+
+    ext = os.path.splitext(clean_filename)[1].lower()
+
+    # Image files: return directly with appropriate mimetype
+    image_mimetypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.tiff': 'image/tiff',
+    }
+
+    if ext in image_mimetypes:
+        return send_file(target_path, mimetype=image_mimetypes[ext], as_attachment=False)
+
+    # PDF files: render first page to PNG using PyMuPDF infrastructure
+    if ext == '.pdf':
+        try:
+            import pymupdf
+            doc = pymupdf.open(target_path)
+            if len(doc) == 0:
+                doc.close()
+                return error_response('PDF document is empty', 400)
+            page = doc[0]
+            pix = page.get_pixmap(dpi=150)
+            png_bytes = pix.tobytes("png")
+            doc.close()
+            return send_file(io.BytesIO(png_bytes), mimetype='image/png', as_attachment=False)
+        except Exception as e:
+            logger.error("PDF preview generation error: %s", e)
+            return error_response('Failed to generate PDF preview', 500)
+
+    # Plain text files: return as text/plain
+    if ext == '.txt':
+        return send_file(target_path, mimetype='text/plain; charset=utf-8', as_attachment=False)
+
+    return error_response('Preview not supported for this file format', 415)
 
 
 # ==================== AUDIT LOGS ROUTE ====================

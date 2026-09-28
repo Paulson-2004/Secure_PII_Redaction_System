@@ -12,3 +12,4 @@ spacy==3.8.11
 sentence-transformers==5.2.3
 faiss-cpu==1.13.2
 PyMuPDF>=1.23.0
+gunicorn>=21.2.0

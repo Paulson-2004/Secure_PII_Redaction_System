@@ -14,7 +14,7 @@ import 'package:pii_redaction/providers/auth_provider.dart';
 import 'package:pii_redaction/providers/document_provider.dart';
 
 void main() {
-  testWidgets('PII Redaction App loads splash screen',
+  testWidgets('PrivLock App loads splash screen',
       (WidgetTester tester) async {
     // Build our app with required providers and trigger a frame.
     await tester.pumpWidget(
@@ -34,6 +34,6 @@ void main() {
     // Verify that the app loaded successfully
     // The splash screen should be displayed
     expect(find.byType(MaterialApp), findsOneWidget);
-    expect(find.text('PII Redaction'), findsOneWidget);
+    expect(find.text('PrivLock'), findsOneWidget);
   });
 }

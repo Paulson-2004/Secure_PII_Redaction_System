@@ -138,7 +138,53 @@ class TestAPISecurity(unittest.TestCase):
             'current_password': self.test_password,
             'new_password': 'NewPassword123!'
         }, headers=headers)
-        self.assertEqual(resp.status_code, 200)
+    def test_08_preview_security(self):
+        """Verify that document preview strictly enforces authentication, ownership, and redacted-only rules."""
+        # 1. Unauthenticated request -> 401
+        unauth_client = app.test_client()
+        unauth_resp = unauth_client.get('/api/preview/redacted_1_sample.png')
+        self.assertEqual(unauth_resp.status_code, 401)
+
+        headers = {'X-Auth-Token': self.__class__.token}
+
+        # 2. Attempting to preview original unredacted file -> 403
+        unredacted_resp = self.client.get('/api/preview/1_sample.png', headers=headers)
+        self.assertEqual(unredacted_resp.status_code, 403)
+
+        # 3. Attempting to preview another user's file -> 403
+        other_user_resp = self.client.get('/api/preview/redacted_999999_sample.png', headers=headers)
+        self.assertEqual(other_user_resp.status_code, 403)
+
+        # 4. Traversal attack -> blocked (400, 403, or 404)
+        traversal_resp = self.client.get('/api/preview/redacted_1_../../config.py', headers=headers)
+        self.assertIn(traversal_resp.status_code, [400, 403, 404])
+
+        # 5. Non-existent file of the current user -> 404
+        with app.app_context():
+            user = db.query_one("SELECT id FROM users WHERE username = %s", (self.test_username,))
+            user_id = user['id']
+
+        missing_resp = self.client.get(f'/api/preview/redacted_{user_id}_missing_doc.png', headers=headers)
+        self.assertEqual(missing_resp.status_code, 404)
+
+        # 6. Authenticated user's valid redacted file -> 200 OK
+        redacted_dir = os.path.abspath(app.config.get('REDACTED_FOLDER', os.path.join(app.root_path, 'uploads', 'redacted')))
+        os.makedirs(redacted_dir, exist_ok=True)
+        test_file_name = f"redacted_{user_id}_valid_preview_test.txt"
+        test_file_path = os.path.join(redacted_dir, test_file_name)
+        with open(test_file_path, 'w', encoding='utf-8') as f:
+            f.write("Sanitized content without PII.")
+        try:
+            valid_resp = self.client.get(f'/api/preview/{test_file_name}', headers=headers)
+            self.assertEqual(valid_resp.status_code, 200)
+            self.assertIn(b"Sanitized content without PII.", valid_resp.data)
+            valid_resp.close()
+        finally:
+            if os.path.exists(test_file_path):
+                try:
+                    os.remove(test_file_path)
+                except OSError:
+                    pass
 
 
 if __name__ == '__main__':

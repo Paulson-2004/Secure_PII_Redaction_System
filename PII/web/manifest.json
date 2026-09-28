@@ -1,11 +1,11 @@
 {
-    "name": "pii_redaction",
-    "short_name": "pii_redaction",
+    "name": "PrivLock — Intelligent PII Detection & Redaction",
+    "short_name": "PrivLock",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1A73E8",
+    "theme_color": "#1A73E8",
+    "description": "PrivLock — Enterprise-grade PII detection and redaction system with automated compliance policy enforcement.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

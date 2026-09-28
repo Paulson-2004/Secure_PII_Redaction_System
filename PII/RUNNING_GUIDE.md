@@ -114,6 +114,55 @@ flutter build apk --release --dart-define=API_BASE_URL=http://<your-pc-ip>:5000
 
 ---
 
+## Method C: Cloud Deployment (Vercel + Render Free Tier)
+
+PrivLock AI is ready for production deployment across free-tier cloud platforms:
+
+### 1. Deploy the Backend to Render
+1. Create a free account at [render.com](https://render.com/).
+2. Create a new **Web Service** and connect your GitHub repository.
+3. Configure the service settings:
+   - **Root Directory**: `PII`
+   - **Runtime**: `Python 3`
+   - **Build Command**:
+     ```bash
+     pip install -r requirements.txt && python -m spacy download en_core_web_sm
+     ```
+   - **Start Command**:
+     ```bash
+     gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+     ```
+4. Configure Environment Variables in Render:
+   - `USE_SQLITE`: `true`
+   - `FLASK_ENV`: `production`
+   - `SECRET_KEY`: `<generate-a-secure-random-string>`
+   - `CORS_ALLOWED_ORIGINS`: `https://<your-app>.vercel.app,http://localhost:*`
+   - `FRONTEND_URL`: `https://<your-app>.vercel.app`
+5. Click **Deploy**. Note your assigned backend URL (e.g. `https://privlock-api.onrender.com`).
+
+### 2. Deploy the Frontend to Vercel (Static Edge Hosting)
+
+Standard Vercel build images do not include the Flutter SDK. Vercel is used as the **static hosting edge CDN** for the compiled Flutter Web bundle (`PII/build/web`).
+
+**Method 1: Local Build & Direct CLI Deploy (Recommended)**
+1. Generate the production release bundle using your actual Render backend URL:
+   ```bash
+   cd PII
+   flutter build web --release --dart-define=API_BASE_URL=https://<your-actual-render-service>.onrender.com
+   ```
+2. Deploy the static `build/web` directory directly to Vercel:
+   ```bash
+   npx vercel deploy build/web --prod
+   ```
+
+**Method 2: Automated GitHub Actions CI (Optional)**
+If you prefer automatic deployment on git push, configure a GitHub Actions workflow using `subosito/flutter-action` to run the build command and deploy the artifact to Vercel using `amondnet/vercel-action`.
+
+> [!NOTE]
+> On Render's free tier, the web service spins down after 15 minutes of inactivity. The first request after a period of dormancy may take 30–50 seconds to initialize the container.
+
+---
+
 ## Recommended Execution Order
 
 1. Start MySQL (if using MySQL; otherwise continue with SQLite fallback).

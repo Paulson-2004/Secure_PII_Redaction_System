@@ -21,10 +21,14 @@ class Config:
     SECRET_KEY = _env('SECRET_KEY', default='dev-insecure-secret-key-change-in-production')
     SESSION_TYPE = 'filesystem'
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = _env('SESSION_COOKIE_SECURE', default='false').lower() in ('true', '1')
+    SESSION_COOKIE_SAMESITE = 'None' if SESSION_COOKIE_SECURE else 'Lax'
     PERMANENT_SESSION_LIFETIME = int(_env('SESSION_LIFETIME_SECONDS', default=7 * 86400))
     AUTH_TOKEN_TTL_HOURS = int(_env('AUTH_TOKEN_TTL_HOURS', default=24))
+
+    # CORS Allowed Origins
+    FRONTEND_URL = _env('FRONTEND_URL', default=None)
+    CORS_ALLOWED_ORIGINS = _env('CORS_ALLOWED_ORIGINS', default=None)
 
     # Database
     USE_SQLITE = _env('USE_SQLITE', default='false').lower() in ('true', '1')
@@ -59,6 +63,8 @@ class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
     TESTING = False
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'None'
 
 
 class TestingConfig(Config):

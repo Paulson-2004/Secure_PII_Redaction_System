@@ -295,7 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        title: const Text('PII Redaction'),
+        title: const Text('PrivLock'),
         actions: const [
           UserAvatarButton(),
         ],

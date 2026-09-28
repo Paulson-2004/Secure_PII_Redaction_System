@@ -54,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             const Text(
-              'PII Redaction',
+              'PrivLock',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 28,
