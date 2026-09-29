@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../models/detection_result.dart';
 import '../providers/document_provider.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/privlock_badge.dart';
+import '../widgets/privlock_metric_card.dart';
 
 class ResultScreen extends StatelessWidget {
   const ResultScreen({super.key});
@@ -11,240 +15,315 @@ class ResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final result = context.watch<DocumentProvider>().lastResult;
     if (result == null) {
-      return const Scaffold(body: Center(child: Text('No result available')));
+      return Scaffold(
+        backgroundColor: AppTheme.surfaceColor,
+        appBar: AppBar(title: const Text('Processing Result')),
+        body: const Center(
+          child: Text('No result available. Please process a document first.'),
+        ),
+      );
     }
-    final downloadFilename =
-        result.redactedFilename.isNotEmpty ? result.redactedFilename : result.filename;
+
+    final downloadFilename = result.redactedFilename.isNotEmpty
+        ? result.redactedFilename
+        : result.filename;
 
     return Scaffold(
+      backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
         title: const Text('Processing Result'),
         actions: [
-          TextButton.icon(
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              try {
-                  final success =
-                      await ApiService.downloadDocument(downloadFilename);
-                if (success) {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('File downloaded to Downloads folder'),
-                      backgroundColor: Color(0xFF34A853),
-                    ),
-                  );
-                } else {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Download failed. Please try again.'),
-                      backgroundColor: Color(0xFFEA4335),
-                    ),
-                  );
-                }
-              } catch (e) {
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Download error: $e'),
-                    backgroundColor: const Color(0xFFEA4335),
-                  ),
-                );
-              }
-            },
-            icon: const Icon(Icons.download_outlined, size: 18),
-            label: const Text('Download'),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Process Another Document',
+            onPressed: () => Navigator.of(context).pop(),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Summary cards ─────────────────────────────────────────────
-            Row(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 1350),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _StatCard(
-                    label: 'PII Found',
-                    value: '${result.piiCount}',
-                    color: result.piiCount > 0
-                        ? const Color(0xFFEA4335)
-                        : const Color(0xFF34A853),
-                    icon: Icons.warning_amber_outlined,
-                  ),
+                // ── Status Banner Header ────────────────────────────────────
+                _buildHeaderBanner(context, result),
+                const SizedBox(height: 18),
+
+                // ── Metric Cards Row (6 KPIs from Report Fig 9.3) ────────────
+                _buildMetricsRow(result),
+                const SizedBox(height: 22),
+
+                // ── Primary Document Preview ────────────────────────────────
+                _RedactedDocumentPreviewCard(
+                  filename: downloadFilename,
+                  originalFilename: result.originalFilename,
+                  docType: result.docType,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _StatCard(
-                    label: 'Action',
-                    value: result.action.toUpperCase(),
-                    color: const Color(0xFF1A73E8),
-                    icon: Icons.build_outlined,
-                  ),
-                ),
+                const SizedBox(height: 22),
+
+                // ── Text Comparison (OCR Extracted vs Redacted) ─────────────
+                if (result.extractedTextPreview.isNotEmpty) ...[
+                  _buildTextComparisonCard(context, result),
+                  const SizedBox(height: 22),
+                ],
+
+                // ── Detected PII Details Table (From Report Fig 9.4) ─────────
+                _buildPiiDetailsTable(result),
+                const SizedBox(height: 22),
+
+                // ── AI Detection Statistics Card (From Report Fig 9.5) ───────
+                _buildDetectionStatsCard(result),
+                const SizedBox(height: 24),
+
+                // ── Bottom Navigation & Actions ─────────────────────────────
+                _buildBottomActions(context, downloadFilename),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
 
-            const SizedBox(height: 24),
-
-            // ── Redacted Document Preview ─────────────────────────────────
-            _RedactedDocumentPreviewCard(
-              filename: downloadFilename,
-              originalFilename: result.originalFilename,
-              docType: result.docType,
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── File info ─────────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE8EAED)),
-              ),
-              child: Row(
+  // ── Header Banner ─────────────────────────────────────────────────────────
+  Widget _buildHeaderBanner(BuildContext context, DetectionResult result) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.insert_drive_file_outlined,
-                      color: Color(0xFF6B7280), size: 20),
-                  const SizedBox(width: 10),
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppTheme.successLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.verified_outlined,
+                      color: AppTheme.accentColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(result.originalFilename,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const Text(
+                          'Redaction Complete',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.slate900,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                         const SizedBox(height: 2),
-                        Text('${result.docType} • ${result.action}',
-                            style: const TextStyle(
-                                fontSize: 12, color: Color(0xFF9CA3AF))),
+                        Text(
+                          result.originalFilename,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.slate600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
-                  _StatusBadge(
-                      result.status == 'processed' ? 'Processed' : 'Failed'),
                 ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Processing summary ────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE8EAED)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Processing Summary',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    result.redactionSummary,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Processed at: ${result.processedAt}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Detected PII list ─────────────────────────────────────────
-            if (result.piiDetected.isEmpty) ...[
-              const _EmptyState(
-                icon: Icons.verified_outlined,
-                title: 'No PII detected',
-                subtitle: 'This document appears clean.',
-              ),
-            ] else ...[
-              Text(
-                'Detected PII Types (${result.piiDetected.length})',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A2E),
-                ),
               ),
               const SizedBox(height: 12),
-              ...result.piiDetected
-                  .map((piiType) => _PiiTypeCard(piiType: piiType)),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const PrivLockBadge(
+                    label: 'PII PROTECTED',
+                    icon: Icons.shield_outlined,
+                    variant: BadgeVariant.success,
+                    isPill: true,
+                  ),
+                  PrivLockBadge(
+                    label: result.docType.toUpperCase(),
+                    variant: BadgeVariant.primary,
+                  ),
+                  PrivLockBadge(
+                    label: result.action.toUpperCase(),
+                    variant: BadgeVariant.purple,
+                  ),
+                  if (result.pageCount > 1)
+                    PrivLockBadge(
+                      label: '${result.pageCount} PAGES',
+                      variant: BadgeVariant.slate,
+                    ),
+                  Text(
+                    '•  Processed at ${result.processedAt.isNotEmpty ? result.processedAt : 'Just now'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.slate500,
+                    ),
+                  ),
+                ],
+              ),
             ],
+          ),
+        );
+  }
+
+  // ── Metrics Row (Report Fig 9.3) ──────────────────────────────────────────
+  Widget _buildMetricsRow(DetectionResult result) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            PrivLockMetricCard(
+              label: 'Total PII',
+              value: '${result.piiCount}',
+              icon: Icons.security,
+              accentColor: result.piiCount > 0
+                  ? AppTheme.dangerColor
+                  : AppTheme.accentColor,
+            ),
+            PrivLockMetricCard(
+              label: 'Full Redacted',
+              value: '${result.fullRedacted}',
+              icon: Icons.block,
+              accentColor: AppTheme.purpleColor,
+            ),
+            PrivLockMetricCard(
+              label: 'Partial Mask',
+              value: '${result.partialMasked}',
+              icon: Icons.visibility_off_outlined,
+              accentColor: AppTheme.warningColor,
+            ),
+            PrivLockMetricCard(
+              label: 'Kept',
+              value: '${result.keptCount}',
+              icon: Icons.check_circle_outline,
+              accentColor: AppTheme.accentColor,
+            ),
+            PrivLockMetricCard(
+              label: 'Regex Hits',
+              value: '${result.regexHits}',
+              icon: Icons.code,
+              accentColor: AppTheme.primaryColor,
+            ),
+            PrivLockMetricCard(
+              label: 'NER Hits',
+              value: '${result.nerHits}',
+              icon: Icons.psychology_outlined,
+              accentColor: const Color(0xFF6366F1),
+            ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
-}
 
-// ── Helper widgets ──────────────────────────────────────────────────────────
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  // ── Text Comparison (Report Fig 9.4) ──────────────────────────────────────
+  Widget _buildTextComparisonCard(BuildContext context, DetectionResult result) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE8EAED)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.slate200),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
+          const Row(
+            children: [
+              Icon(Icons.compare_arrows_outlined,
+                  size: 18, color: AppTheme.primaryColor),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Text Comparison & Extraction Preview',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.slate900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.slate50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.slate200),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'EXTRACTED TEXT (OCR SAMPLE)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.slate500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_outlined, size: 14),
+                      tooltip: 'Copy text sample',
+                      onPressed: () {
+                        Clipboard.setData(
+                          ClipboardData(text: result.extractedTextPreview),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Copied OCR sample to clipboard'),
+                            backgroundColor: AppTheme.accentColor,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
                 Text(
-                  label,
+                  result.extractedTextPreview,
                   style: const TextStyle(
+                    fontFamily: 'monospace',
                     fontSize: 12,
-                    color: Color(0xFF9CA3AF),
+                    color: AppTheme.slate700,
+                    height: 1.5,
                   ),
                 ),
               ],
@@ -254,126 +333,372 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _StatusBadge extends StatelessWidget {
-  final String status;
-
-  const _StatusBadge(this.status);
-
-  @override
-  Widget build(BuildContext context) {
-    Color color;
-    switch (status.toLowerCase()) {
-      case 'processed':
-        color = const Color(0xFF34A853);
-        break;
-      case 'failed':
-        color = const Color(0xFFEA4335);
-        break;
-      default:
-        color = const Color(0xFF9CA3AF);
-    }
+  // ── Detected PII Details Table (Report Fig 9.4) ───────────────────────────
+  Widget _buildPiiDetailsTable(DetectionResult result) {
+    final details = result.piiDetails;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        status,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        children: [
-          Icon(icon, size: 48, color: const Color(0xFF9CA3AF)),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A2E),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF9CA3AF),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PiiTypeCard extends StatelessWidget {
-  final String piiType;
-
-  const _PiiTypeCard({required this.piiType});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8EAED)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.slate200),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_outlined,
-              color: Color(0xFFEA4335), size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              piiType.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A2E),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 400;
+              const titleWidget = Row(
+                children: [
+                  Icon(Icons.list_alt_outlined,
+                      size: 18, color: AppTheme.primaryColor),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Detected PII Details',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.slate900,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+              final badgeWidget = PrivLockBadge(
+                label: '${details.length} ENTITIES',
+                variant: BadgeVariant.primary,
+                isPill: true,
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleWidget,
+                    const SizedBox(height: 8),
+                    badgeWidget,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  const Expanded(child: titleWidget),
+                  const SizedBox(width: 8),
+                  badgeWidget,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          if (details.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: const Center(
+                child: Text(
+                  'No PII entities detected in this document.',
+                  style: TextStyle(fontSize: 13, color: AppTheme.slate500),
+                ),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 800),
+                child: DataTable(
+                  headingRowColor:
+                      WidgetStateProperty.all(AppTheme.slate50),
+                  horizontalMargin: 12,
+                  columnSpacing: 18,
+                  headingTextStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.slate500,
+                    letterSpacing: 0.5,
+                  ),
+                  columns: const [
+                    DataColumn(label: Text('#')),
+                    DataColumn(label: Text('PII TYPE')),
+                    DataColumn(label: Text('SOURCE')),
+                    DataColumn(label: Text('CONFIDENCE')),
+                    DataColumn(label: Text('DECISION')),
+                    DataColumn(label: Text('SEVERITY')),
+                    DataColumn(label: Text('REGULATORY MANDATE')),
+                  ],
+                  rows: List.generate(details.length, (index) {
+                    final item = details[index];
+                    return DataRow(
+                      cells: [
+                        DataCell(Text('${index + 1}',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.slate500))),
+                        DataCell(
+                          Text(
+                            item.type,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.slate900,
+                            ),
+                          ),
+                        ),
+                        DataCell(PrivLockBadge.source(item.source)),
+                        DataCell(
+                          Text(
+                            '${(item.confidence * 100).toInt()}%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.slate700,
+                            ),
+                          ),
+                        ),
+                        DataCell(PrivLockBadge.decision(item.decision)),
+                        DataCell(PrivLockBadge.severity(item.severity)),
+                        DataCell(
+                          Text(
+                            item.regulation,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.slate600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
               ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 20),
         ],
       ),
     );
   }
+
+  // ── AI Detection Statistics Card (Report Fig 9.5) ─────────────────────────
+  Widget _buildDetectionStatsCard(DetectionResult result) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.slate200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.query_stats_outlined,
+                  size: 18, color: AppTheme.primaryColor),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'AI Detection Statistics',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.slate900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 700;
+              return isWide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(child: _buildDetectionSources(result)),
+                        const SizedBox(width: 24),
+                        Expanded(child: _buildAvgConfidence(result)),
+                        const SizedBox(width: 24),
+                        Expanded(child: _buildProcessingTime(result)),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildDetectionSources(result),
+                        const SizedBox(height: 14),
+                        _buildAvgConfidence(result),
+                        const SizedBox(height: 14),
+                        _buildProcessingTime(result),
+                      ],
+                    );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetectionSources(DetectionResult result) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'DETECTION SOURCES',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.slate500,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            PrivLockBadge(label: 'Regex: ${result.regexHits}', variant: BadgeVariant.success),
+            PrivLockBadge(label: 'NER: ${result.nerHits}', variant: BadgeVariant.purple),
+            PrivLockBadge(label: 'Hybrid: ${result.hybridHits}', variant: BadgeVariant.primary),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvgConfidence(DetectionResult result) {
+    final confPercent = (result.averageConfidence * 100).clamp(0, 100).toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'AVG. CONFIDENCE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.slate500,
+                letterSpacing: 0.5,
+              ),
+            ),
+            Text(
+              '${confPercent.toStringAsFixed(1)}%',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.accentColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: confPercent / 100,
+            minHeight: 8,
+            backgroundColor: AppTheme.slate100,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProcessingTime(DetectionResult result) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'PROCESSING LATENCY',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.slate500,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          result.processingTime > 0
+              ? '${result.processingTime.toStringAsFixed(2)}s'
+              : '< 1.0s',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.primaryColor,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Bottom Actions ────────────────────────────────────────────────────────
+  Widget _buildBottomActions(BuildContext context, String downloadFilename) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 520;
+        final downloadBtn = ElevatedButton.icon(
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final success =
+                await ApiService.downloadDocument(downloadFilename);
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(success
+                    ? 'Redacted file saved to Downloads'
+                    : 'Download failed. Please try again.'),
+                backgroundColor:
+                    success ? AppTheme.accentColor : AppTheme.dangerColor,
+              ),
+            );
+          },
+          icon: const Icon(Icons.download_outlined, size: 18),
+          label: const Text('Download Redacted Document'),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+          ),
+        );
+
+        final processAnotherBtn = OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.refresh_outlined, size: 16),
+          label: const Text('Process Another Document'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+          ),
+        );
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              downloadBtn,
+              const SizedBox(height: 10),
+              processAnotherBtn,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: downloadBtn),
+            const SizedBox(width: 12),
+            processAnotherBtn,
+          ],
+        );
+      },
+    );
+  }
 }
 
-// ── Redacted Document Preview Card ──────────────────────────────────────────
+// ── Redacted Document Preview Card (Preserving Full Working Logic) ──────────
 
 class _RedactedDocumentPreviewCard extends StatefulWidget {
   final String filename;
@@ -444,26 +769,20 @@ class _RedactedDocumentPreviewCardState
     final messenger = ScaffoldMessenger.of(context);
     try {
       final success = await ApiService.downloadDocument(widget.filename);
-      if (success) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('File downloaded to Downloads folder'),
-            backgroundColor: Color(0xFF34A853),
-          ),
-        );
-      } else {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Download failed. Please try again.'),
-            backgroundColor: Color(0xFFEA4335),
-          ),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'File downloaded to Downloads folder'
+              : 'Download failed. Please try again.'),
+          backgroundColor:
+              success ? AppTheme.accentColor : AppTheme.dangerColor,
+        ),
+      );
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
           content: Text('Download error: $e'),
-          backgroundColor: const Color(0xFFEA4335),
+          backgroundColor: AppTheme.dangerColor,
         ),
       );
     }
@@ -497,7 +816,7 @@ class _RedactedDocumentPreviewCardState
                 child: Row(
                   children: [
                     const Icon(Icons.shield_outlined,
-                        color: Color(0xFF34A853), size: 20),
+                        color: AppTheme.accentColor, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -526,7 +845,6 @@ class _RedactedDocumentPreviewCardState
                 ),
               ),
               const Divider(height: 1, color: Colors.white24),
-              // Zoomable Image
               Flexible(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -554,34 +872,11 @@ class _RedactedDocumentPreviewCardState
   }
 
   Widget _buildRedactedBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6F4EA),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF34A853).withValues(alpha: 0.3),
-        ),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.shield_outlined, size: 13, color: Color(0xFF34A853)),
-          SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              'Redacted Output',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF34A853),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return const PrivLockBadge(
+      label: 'REDACTED',
+      icon: Icons.shield_outlined,
+      variant: BadgeVariant.success,
+      isPill: true,
     );
   }
 
@@ -596,7 +891,7 @@ class _RedactedDocumentPreviewCardState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8EAED)),
+        border: Border.all(color: AppTheme.slate200),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -620,12 +915,12 @@ class _RedactedDocumentPreviewCardState
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F0FE),
+                        color: AppTheme.primaryLight,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
                         Icons.visibility_outlined,
-                        color: Color(0xFF1A73E8),
+                        color: AppTheme.primaryColor,
                         size: 22,
                       ),
                     ),
@@ -640,7 +935,7 @@ class _RedactedDocumentPreviewCardState
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1A1A2E),
+                                color: AppTheme.slate900,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -654,7 +949,7 @@ class _RedactedDocumentPreviewCardState
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1A1A2E),
+                                      color: AppTheme.slate900,
                                     ),
                                   ),
                                 ),
@@ -668,7 +963,7 @@ class _RedactedDocumentPreviewCardState
                             'Visual preview of sanitized output. Sensitive PII has been redacted.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF6B7280),
+                              color: AppTheme.slate500,
                             ),
                           ),
                         ],
@@ -680,7 +975,7 @@ class _RedactedDocumentPreviewCardState
             ),
           ),
 
-          const Divider(height: 1, color: Color(0xFFF1F3F4)),
+          const Divider(height: 1, color: AppTheme.slate200),
 
           // ── Content ───────────────────────────────────────────────────────
           Padding(
@@ -692,10 +987,10 @@ class _RedactedDocumentPreviewCardState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
+              color: AppTheme.slate50,
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
               border: Border(
-                top: BorderSide(color: Color(0xFFF1F3F4)),
+                top: BorderSide(color: AppTheme.slate200),
               ),
             ),
             child: LayoutBuilder(
@@ -719,7 +1014,7 @@ class _RedactedDocumentPreviewCardState
                             icon: const Icon(Icons.download_outlined, size: 16),
                             label: const Text('Download Redacted File'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1A73E8),
+                              backgroundColor: AppTheme.primaryColor,
                               foregroundColor: Colors.white,
                               elevation: 0,
                               minimumSize: const Size(0, 40),
@@ -741,9 +1036,9 @@ class _RedactedDocumentPreviewCardState
                                   size: 16),
                               label: const Text('Enlarge Preview'),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF1A73E8),
+                                foregroundColor: AppTheme.primaryColor,
                                 side: const BorderSide(
-                                    color: Color(0xFFDADCE0)),
+                                    color: AppTheme.slate200),
                                 minimumSize: const Size(0, 40),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 10),
@@ -766,14 +1061,14 @@ class _RedactedDocumentPreviewCardState
                             const SnackBar(
                               content:
                                   Text('Redacted text copied to clipboard'),
-                              backgroundColor: Color(0xFF34A853),
+                              backgroundColor: AppTheme.accentColor,
                             ),
                           );
                         },
                         icon: const Icon(Icons.copy_outlined, size: 14),
                         label: const Text('Copy Redacted Text'),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF5F6368),
+                          foregroundColor: AppTheme.slate600,
                         ),
                       ),
                   ],
@@ -800,13 +1095,13 @@ class _RedactedDocumentPreviewCardState
               height: 32,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1A73E8)),
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             ),
             SizedBox(height: 12),
             Text(
               'Loading redacted preview...',
-              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 13, color: AppTheme.slate500),
             ),
           ],
         ),
@@ -820,18 +1115,18 @@ class _RedactedDocumentPreviewCardState
         child: Column(
           children: [
             const Icon(Icons.error_outline,
-                size: 40, color: Color(0xFFEA4335)),
+                size: 40, color: AppTheme.dangerColor),
             const SizedBox(height: 10),
             Text(
               _error ?? 'Unable to display preview.',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+              style: const TextStyle(fontSize: 14, color: AppTheme.slate800),
             ),
             const SizedBox(height: 6),
             const Text(
               'You can still download the full redacted file using the button below.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 12, color: AppTheme.slate500),
             ),
             const SizedBox(height: 14),
             OutlinedButton.icon(
@@ -839,7 +1134,7 @@ class _RedactedDocumentPreviewCardState
               icon: const Icon(Icons.refresh, size: 14),
               label: const Text('Retry Preview'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1A73E8),
+                foregroundColor: AppTheme.primaryColor,
                 minimumSize: const Size(0, 36),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -861,7 +1156,7 @@ class _RedactedDocumentPreviewCardState
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
+                color: AppTheme.primaryLight,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFBFDBFE)),
               ),
@@ -872,11 +1167,11 @@ class _RedactedDocumentPreviewCardState
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Page 1 Preview — Full Redacted PDF Available for Download',
+                      'Page 1 Preview — Complete Redacted PDF Available for Download',
                       style: TextStyle(
                         color: Color(0xFF1D4ED8),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -891,11 +1186,11 @@ class _RedactedDocumentPreviewCardState
                 children: [
                   Container(
                     width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 380),
+                    constraints: const BoxConstraints(maxHeight: 450),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: AppTheme.slate50,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: AppTheme.slate200),
                     ),
                     padding: const EdgeInsets.all(8),
                     child: Center(
@@ -913,22 +1208,22 @@ class _RedactedDocumentPreviewCardState
                     right: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.65),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.zoom_in, color: Colors.white, size: 14),
+                          Icon(Icons.fullscreen, color: Colors.white, size: 14),
                           SizedBox(width: 4),
                           Text(
-                            'Click to zoom',
+                            'Click to Zoom',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -945,58 +1240,30 @@ class _RedactedDocumentPreviewCardState
 
     // ── Text Document Preview ───────────────────────────────────────────────
     if (isText && _previewData?['text'] != null) {
+      final text = _previewData!['text'] as String;
       return Container(
         width: double.infinity,
-        constraints: const BoxConstraints(maxHeight: 280),
-        padding: const EdgeInsets.all(14),
+        constraints: const BoxConstraints(maxHeight: 400),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: AppTheme.slate50,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: AppTheme.slate200),
         ),
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
           child: SelectableText(
-            _previewData!['text'] as String,
+            text,
             style: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 13,
-              color: Color(0xFF1E293B),
-              height: 1.5,
+              color: AppTheme.slate800,
+              height: 1.6,
             ),
           ),
         ),
       );
     }
 
-    // ── Non-visual Placeholder ──────────────────────────────────────────────
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: const Column(
-        children: [
-          Icon(Icons.shield_outlined, size: 48, color: Color(0xFF1A73E8)),
-          SizedBox(height: 12),
-          Text(
-            'Redacted Document Ready',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          SizedBox(height: 6),
-          Text(
-            'Visual preview is not supported for this file format, but your redacted document has been generated securely.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }
