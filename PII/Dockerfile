@@ -13,6 +13,10 @@ RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Install CPU-only PyTorch first to avoid installing ~2.5GB of CUDA/NVIDIA runtime packages
+RUN pip install --no-cache-dir "torch==2.14.0+cpu" \
+    --index-url https://download.pytorch.org/whl/cpu
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 
