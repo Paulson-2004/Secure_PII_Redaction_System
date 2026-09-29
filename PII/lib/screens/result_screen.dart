@@ -553,6 +553,38 @@ class _RedactedDocumentPreviewCardState
     );
   }
 
+  Widget _buildRedactedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F4EA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF34A853).withValues(alpha: 0.3),
+        ),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.shield_outlined, size: 13, color: Color(0xFF34A853)),
+          SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              'Redacted Output',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF34A853),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isPdf = widget.filename.toLowerCase().endsWith('.pdf') ||
@@ -579,73 +611,72 @@ class _RedactedDocumentPreviewCardState
           // ── Header ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F0FE),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.visibility_outlined,
-                    color: Color(0xFF1A73E8),
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Redacted Document Preview',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1A2E),
-                        ),
+            child: LayoutBuilder(
+              builder: (context, headerConstraints) {
+                final bool isNarrow = headerConstraints.maxWidth < 450;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F0FE),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Visual preview of sanitized output. Sensitive PII has been redacted.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6B7280),
-                        ),
+                      child: const Icon(
+                        Icons.visibility_outlined,
+                        color: Color(0xFF1A73E8),
+                        size: 22,
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE6F4EA),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF34A853).withValues(alpha: 0.3),
                     ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.shield_outlined,
-                          size: 13, color: Color(0xFF34A853)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Redacted Output',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF34A853),
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (isNarrow) ...[
+                            const Text(
+                              'Redacted Document Preview',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A1A2E),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            _buildRedactedBadge(),
+                          ] else ...[
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Redacted Document Preview',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1A1A2E),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _buildRedactedBadge(),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Visual preview of sanitized output. Sensitive PII has been redacted.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
@@ -667,73 +698,87 @@ class _RedactedDocumentPreviewCardState
                 top: BorderSide(color: Color(0xFFF1F3F4)),
               ),
             ),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: _downloadFile,
-                      icon: const Icon(Icons.download_outlined, size: 16),
-                      label: const Text('Download Redacted File'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A73E8),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                    if (isImage && _previewData?['bytes'] != null) ...[
-                      const SizedBox(width: 10),
-                      OutlinedButton.icon(
-                        onPressed: () => _openLightbox(
-                          context,
-                          _previewData!['bytes'] as Uint8List,
-                          widget.originalFilename,
-                        ),
-                        icon: const Icon(Icons.fullscreen_outlined, size: 16),
-                        label: const Text('Enlarge Preview'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF1A73E8),
-                          side: const BorderSide(color: Color(0xFFDADCE0)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                    ConstrainedBox(
+                      constraints:
+                          BoxConstraints(maxWidth: constraints.maxWidth),
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _downloadFile,
+                            icon: const Icon(Icons.download_outlined, size: 16),
+                            label: const Text('Download Redacted File'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1A73E8),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              minimumSize: const Size(0, 40),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
                           ),
+                          if (isImage && _previewData?['bytes'] != null)
+                            OutlinedButton.icon(
+                              onPressed: () => _openLightbox(
+                                context,
+                                _previewData!['bytes'] as Uint8List,
+                                widget.originalFilename,
+                              ),
+                              icon: const Icon(Icons.fullscreen_outlined,
+                                  size: 16),
+                              label: const Text('Enlarge Preview'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF1A73E8),
+                                side: const BorderSide(
+                                    color: Color(0xFFDADCE0)),
+                                minimumSize: const Size(0, 40),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (isText && _previewData?['text'] != null)
+                      TextButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(
+                            ClipboardData(
+                                text: _previewData!['text'] as String),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Redacted text copied to clipboard'),
+                              backgroundColor: Color(0xFF34A853),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_outlined, size: 14),
+                        label: const Text('Copy Redacted Text'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF5F6368),
                         ),
                       ),
-                    ],
                   ],
-                ),
-                if (isText && _previewData?['text'] != null)
-                  TextButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(
-                        ClipboardData(text: _previewData!['text'] as String),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Redacted text copied to clipboard'),
-                          backgroundColor: Color(0xFF34A853),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.copy_outlined, size: 14),
-                    label: const Text('Copy Redacted Text'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF5F6368),
-                    ),
-                  ),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -795,6 +840,9 @@ class _RedactedDocumentPreviewCardState
               label: const Text('Retry Preview'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF1A73E8),
+                minimumSize: const Size(0, 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
             ),
           ],
