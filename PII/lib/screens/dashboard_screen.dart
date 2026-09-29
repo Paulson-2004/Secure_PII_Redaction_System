@@ -16,13 +16,18 @@ import 'audit_logs_screen.dart';
 import 'result_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final String? initialAction;
+
+  const DashboardScreen({super.key, this.initialAction});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _uploadStudioKey = GlobalKey();
+
   File? _selectedFile;
   Uint8List? _selectedFileBytes;
   String? _selectedFileName;
@@ -40,8 +45,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<DocumentProvider>().loadAuditLogs();
+        if (widget.initialAction == 'upload') {
+          _scrollToUploadStudio();
+        }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToUploadStudio() {
+    final ctx = _uploadStudioKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Future<void> _loadSystemHealth() async {
@@ -415,11 +440,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         currentRoute: 'dashboard',
         onMenuItemSelected: (menuItem) {
           if (menuItem == 'upload') {
-            _showFileSourceSheet();
+            _scrollToUploadStudio();
           }
         },
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Center(
           child: Container(
@@ -608,6 +634,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ── Upload & Redaction Studio (Primary Card) ──────────────────────────────
   Widget _buildUploadStudioCard() {
     return Container(
+      key: _uploadStudioKey,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,

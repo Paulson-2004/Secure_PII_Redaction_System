@@ -85,8 +85,15 @@ call venv\Scripts\activate.bat
 
 echo.
 REM 3. Launch the Backend
+echo [*] Checking backend status...
+curl -s http://127.0.0.1:5000/api/health >nul 2>nul
+if !ERRORLEVEL! EQU 0 (
+    echo [OK] Backend is already running and ready.
+    goto BACKEND_READY
+)
+
 echo [*] Starting Flask backend...
-start "PrivLock Flask Backend" cmd /c "call venv\Scripts\activate.bat && python app.py"
+start "PrivLock Flask Backend" /D "%~dp0PII" cmd /c "call venv\Scripts\activate.bat && python app.py"
 
 echo [*] Waiting for Flask backend to become ready...
 set MAX_RETRIES=30
@@ -94,9 +101,9 @@ set RETRY_COUNT=0
 
 :HEALTH_CHECK
 ping 127.0.0.1 -n 3 >nul
-curl -s http://127.0.0.1:5000/api/health >nul
-if %ERRORLEVEL% EQU 0 (
-    echo [OK] Backend is ready!
+curl -s http://127.0.0.1:5000/api/health >nul 2>nul
+if !ERRORLEVEL! EQU 0 (
+    echo [OK] Backend is ready.
     goto BACKEND_READY
 )
 set /a RETRY_COUNT+=1 >nul
@@ -111,24 +118,71 @@ goto HEALTH_CHECK
 :BACKEND_READY
 echo.
 REM 4. Launch the Frontend
-set WEB_DEVICE=edge
-flutter devices 2>nul | findstr /i /c:"edge" >nul 2>nul
-if %ERRORLEVEL% EQU 0 (
-    set WEB_DEVICE=edge
-)
+echo [*] Detecting web browser...
+set WEB_DEVICE=
+set BROWSER_NAME=
+
+REM Prefer Chrome if available
 flutter devices 2>nul | findstr /i /c:"chrome" >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
     set WEB_DEVICE=chrome
+    set BROWSER_NAME=Chrome
+    goto BROWSER_DETECTED
 )
 
-echo [*] Starting Flutter Frontend on !WEB_DEVICE!...
-start "PrivLock Flutter Frontend" cmd /c "flutter run -d !WEB_DEVICE! --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080"
+REM Fall back to Edge if Chrome is not available
+flutter devices 2>nul | findstr /i /c:"edge" >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    set WEB_DEVICE=edge
+    set BROWSER_NAME=Edge
+    goto BROWSER_DETECTED
+)
 
+:BROWSER_DETECTED
+if not defined WEB_DEVICE (
+    echo [ERROR] No supported web browser found for Flutter - Chrome or Edge required.
+    echo Please ensure Google Chrome or Microsoft Edge is installed.
+    pause
+    exit /b 1
+)
+
+echo [OK] Browser device detected: !BROWSER_NAME!
+
+REM Check if Flutter Frontend is already running
+curl -s http://localhost:5080 >nul 2>nul
+if !ERRORLEVEL! EQU 0 (
+    echo [OK] Flutter Frontend is already running on http://localhost:5080.
+    goto FRONTEND_READY
+)
+
+echo [*] Starting Flutter Frontend in !BROWSER_NAME!...
+start "PrivLock Flutter Frontend" /D "%~dp0PII" cmd /k "flutter run -d !WEB_DEVICE! --dart-define=API_BASE_URL=http://127.0.0.1:5000 --web-port=5080"
+
+echo [*] Waiting for Flutter Frontend to start on http://localhost:5080...
+set FLUTTER_MAX_RETRIES=40
+set FLUTTER_RETRY_COUNT=0
+
+:FLUTTER_HEALTH_CHECK
+ping 127.0.0.1 -n 2 >nul
+curl -s http://localhost:5080 >nul 2>nul
+if !ERRORLEVEL! EQU 0 (
+    echo [OK] Flutter Frontend is ready.
+    goto FRONTEND_READY
+)
+set /a FLUTTER_RETRY_COUNT+=1 >nul
+if !FLUTTER_RETRY_COUNT! GEQ !FLUTTER_MAX_RETRIES! (
+    echo [WARNING] Flutter Frontend is taking longer than expected to bind port 5080.
+    echo Please check the "PrivLock Flutter Frontend" window for build progress or errors.
+    goto FRONTEND_READY
+)
+goto FLUTTER_HEALTH_CHECK
+
+:FRONTEND_READY
 echo.
 echo ==============================================================
-echo PrivLock AI has been launched!
+echo PrivLock AI has been launched.
 echo - Flask Backend is running in a separate window.
-echo - Flutter Frontend is running on !WEB_DEVICE! (http://localhost:5080).
+echo - Flutter Frontend is running on !BROWSER_NAME! (http://localhost:5080).
 echo   (PrivLock AI supports any modern web browser: Edge, Chrome, Firefox, Safari)
 echo.
 echo To gracefully stop the application, run:

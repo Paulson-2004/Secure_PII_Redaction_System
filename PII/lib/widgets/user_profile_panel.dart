@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../screens/account_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/settings_screen.dart';
 import 'change_password_dialog.dart';
 
 class UserProfilePanel extends StatelessWidget {
@@ -109,8 +111,11 @@ class UserProfilePanel extends StatelessWidget {
                 icon: Icons.person_outline,
                 label: 'Manage Account',
                 onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Navigate to account management screen
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.push(
+                    MaterialPageRoute(builder: (_) => const AccountScreen()),
+                  );
                 },
               ),
 
@@ -118,8 +123,11 @@ class UserProfilePanel extends StatelessWidget {
                 icon: Icons.settings_outlined,
                 label: 'Settings',
                 onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Navigate to settings screen
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
                 },
               ),
 
@@ -139,12 +147,13 @@ class UserProfilePanel extends StatelessWidget {
                 label: 'Sign Out',
                 isDestructive: true,
                 onTap: () async {
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
                   await auth.logout();
-                  if (context.mounted) {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
-                  }
+                  navigator.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
                 },
               ),
             ],

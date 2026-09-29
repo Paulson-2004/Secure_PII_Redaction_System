@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../screens/login_screen.dart';
 import '../screens/audit_logs_screen.dart';
+import '../screens/dashboard_screen.dart';
+import '../screens/login_screen.dart';
+import '../screens/pin_fingerprint_setup_screen.dart';
+import '../theme/app_theme.dart';
+import 'change_email_dialog.dart';
 import 'change_password_dialog.dart';
 
 class AppDrawer extends StatefulWidget {
-  final Function(String) onMenuItemSelected;
+  final Function(String)? onMenuItemSelected;
   final String currentRoute;
 
   const AppDrawer({
     super.key,
-    required this.onMenuItemSelected,
+    this.onMenuItemSelected,
     required this.currentRoute,
   });
 
@@ -22,13 +26,40 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   bool _showSecuritySettings = false;
 
+  void _navigateToDashboard({bool scrollToUpload = false}) {
+    Navigator.pop(context);
+    if (widget.currentRoute == 'dashboard') {
+      if (scrollToUpload && widget.onMenuItemSelected != null) {
+        widget.onMenuItemSelected!('upload');
+      }
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) =>
+              DashboardScreen(initialAction: scrollToUpload ? 'upload' : null),
+        ),
+      );
+    }
+  }
+
+  void _navigateToAuditLogs() {
+    Navigator.pop(context);
+    if (widget.currentRoute != 'history') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AuditLogsScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final initial =
+        (auth.username.isNotEmpty ? auth.username[0] : 'U').toUpperCase();
 
     return Drawer(
       child: Container(
-        color: const Color(0xFFFAFAFA),
+        color: Colors.white,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -38,56 +69,51 @@ class _AppDrawerState extends State<AppDrawer> {
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF1A73E8), Color(0xFF0D47A1)],
+                  colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
               ),
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
+              padding: const EdgeInsets.fromLTRB(18, 32, 18, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(30),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(28),
                       border: Border.all(color: Colors.white, width: 2),
                     ),
                     child: Center(
                       child: Text(
-                        (auth.username.isNotEmpty 
-                            ? auth.username[0] 
-                            : 'U').toUpperCase(),
+                        initial,
                         style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
                           color: Colors.white,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // User Name
                   Text(
-                    auth.username,
+                    auth.username.isNotEmpty ? auth.username : 'User',
                     style: const TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  // User Email
+                  const SizedBox(height: 2),
                   Text(
-                    auth.email,
+                    auth.email.isNotEmpty ? auth.email : 'PrivLock Operator',
                     style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -101,62 +127,52 @@ class _AppDrawerState extends State<AppDrawer> {
             // ──────────────────────────────────────────
             // MAIN FEATURES SECTION
             // ──────────────────────────────────────────
-            _buildSectionDivider('APP FEATURES'),
+            _buildSectionDivider('CORE WORKFLOWS'),
+
             _buildDrawerItem(
               icon: Icons.dashboard_outlined,
               label: 'Dashboard',
               routeName: 'dashboard',
               isSelected: widget.currentRoute == 'dashboard',
-              onTap: () {
-                widget.onMenuItemSelected('dashboard');
-                Navigator.pop(context);
-              },
+              onTap: () => _navigateToDashboard(scrollToUpload: false),
             ),
+
             _buildDrawerItem(
               icon: Icons.upload_file_outlined,
               label: 'Upload Document',
               routeName: 'upload',
-              isSelected: widget.currentRoute == 'upload',
-              onTap: () {
-                widget.onMenuItemSelected('upload');
-                Navigator.pop(context);
-              },
+              isSelected: false,
+              onTap: () => _navigateToDashboard(scrollToUpload: true),
             ),
+
             _buildDrawerItem(
               icon: Icons.history_outlined,
               label: 'Redaction History',
               routeName: 'history',
               isSelected: widget.currentRoute == 'history',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AuditLogsScreen()),
-                );
-              },
+              onTap: _navigateToAuditLogs,
             ),
+
             _buildDrawerItem(
               icon: Icons.lock_outline,
               label: 'Secure Files',
               routeName: 'secure',
-              isSelected: widget.currentRoute == 'secure',
-              onTap: () {
-                widget.onMenuItemSelected('secure');
-                Navigator.pop(context);
-              },
+              isSelected: false,
+              onTap: _navigateToAuditLogs,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // ──────────────────────────────────────────
             // SETTINGS SECTION
             // ──────────────────────────────────────────
-            _buildSectionDivider('SETTINGS & SECURITY'),
+            _buildSectionDivider('SECURITY & ACCOUNT'),
 
             _buildDrawerItem(
               icon: Icons.lock_reset_outlined,
               label: 'Change Password',
               routeName: 'change_password',
-              isSelected: widget.currentRoute == 'change_password',
+              isSelected: false,
               onTap: () {
                 Navigator.pop(context);
                 ChangePasswordDialog.show(context);
@@ -167,15 +183,15 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: Icons.email_outlined,
               label: 'Change Email',
               routeName: 'change_email',
-              isSelected: widget.currentRoute == 'change_email',
+              isSelected: false,
               onTap: () {
-                widget.onMenuItemSelected('change_email');
                 Navigator.pop(context);
+                ChangeEmailDialog.show(context);
               },
             ),
 
             // Expandable Security Settings
-            _buildExpandableSecurity(),
+            _buildExpandableSecurity(auth),
 
             const SizedBox(height: 16),
 
@@ -183,27 +199,27 @@ class _AppDrawerState extends State<AppDrawer> {
             // LOGOUT SECTION
             // ──────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               child: ElevatedButton.icon(
                 onPressed: () async {
+                  Navigator.pop(context);
                   await auth.logout();
                   if (context.mounted) {
-                    Navigator.of(context).pushReplacement(
+                    Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
                     );
                   }
                 },
-                icon: const Icon(Icons.logout, size: 18),
+                icon: const Icon(Icons.logout, size: 16),
                 label: const Text('Sign Out'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade50,
-                  foregroundColor: Colors.red.shade700,
+                  backgroundColor: AppTheme.dangerLight,
+                  foregroundColor: AppTheme.dangerColor,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: Colors.red.shade200),
-                  ),
+                  side: BorderSide(
+                      color: AppTheme.dangerColor.withValues(alpha: 0.3)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
@@ -213,30 +229,31 @@ class _AppDrawerState extends State<AppDrawer> {
             // ──────────────────────────────────────────
             // APP INFO
             // ──────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  const Divider(),
-                  const SizedBox(height: 8),
+                  Divider(color: AppTheme.slate200),
+                  SizedBox(height: 8),
                   Text(
                     'PrivLock v1.0.0',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.slate600,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 2),
                   Text(
-                    'Secure PII Redaction',
+                    'AI PII Detection & Policy Decision Engine',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade500,
+                      color: AppTheme.slate400,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                 ],
               ),
             ),
@@ -246,47 +263,60 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  Widget _buildExpandableSecurity() {
+  Widget _buildExpandableSecurity(AuthProvider auth) {
     return Column(
       children: [
         ListTile(
-          contentPadding: const EdgeInsets.fromLTRB(20, 4, 16, 4),
-          leading: const Icon(Icons.security_outlined, size: 22),
+          contentPadding: const EdgeInsets.fromLTRB(20, 2, 16, 2),
+          leading: const Icon(Icons.security_outlined,
+              size: 20, color: AppTheme.slate700),
           title: const Text(
             'Security Options',
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1A1A2E),
+              fontWeight: FontWeight.w600,
+              color: AppTheme.slate800,
             ),
           ),
           trailing: Icon(
             _showSecuritySettings ? Icons.expand_less : Icons.expand_more,
-            color: Colors.grey.shade600,
+            color: AppTheme.slate500,
+            size: 20,
           ),
-          onTap: () => setState(() => _showSecuritySettings = !_showSecuritySettings),
+          onTap: () =>
+              setState(() => _showSecuritySettings = !_showSecuritySettings),
         ),
         if (_showSecuritySettings) ...[
           _buildDrawerItem(
             icon: Icons.pin_outlined,
             label: 'PIN Setup',
             routeName: 'pin_setup',
-            isSelected: widget.currentRoute == 'pin_setup',
+            isSelected: false,
             indented: true,
             onTap: () {
-              widget.onMenuItemSelected('pin_setup');
               Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      PINFingerprintSetupScreen(username: auth.username),
+                ),
+              );
             },
           ),
           _buildDrawerItem(
             icon: Icons.fingerprint_outlined,
             label: 'Fingerprint Setup',
             routeName: 'fingerprint_setup',
-            isSelected: widget.currentRoute == 'fingerprint_setup',
+            isSelected: false,
             indented: true,
             onTap: () {
-              widget.onMenuItemSelected('fingerprint_setup');
               Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      PINFingerprintSetupScreen(username: auth.username),
+                ),
+              );
             },
           ),
         ],
@@ -296,14 +326,14 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Widget _buildSectionDivider(String label) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey.shade600,
-          letterSpacing: 0.5,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.slate400,
+          letterSpacing: 0.6,
         ),
       ),
     );
@@ -318,35 +348,35 @@ class _AppDrawerState extends State<AppDrawer> {
     bool indented = false,
   }) {
     return Container(
-      margin: EdgeInsets.fromLTRB(indented ? 24 : 12, 4, 12, 4),
+      margin: EdgeInsets.fromLTRB(indented ? 24 : 12, 2, 12, 2),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF1A73E8).withValues(alpha: 0.1) : Colors.transparent,
+        color: isSelected ? AppTheme.primaryLight : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
         contentPadding: EdgeInsets.symmetric(
-          horizontal: indented ? 12 : 8,
-          vertical: 4,
+          horizontal: indented ? 12 : 10,
+          vertical: 2,
         ),
         leading: Icon(
           icon,
-          size: 22,
-          color: isSelected ? const Color(0xFF1A73E8) : Colors.grey.shade700,
+          size: 20,
+          color: isSelected ? AppTheme.primaryColor : AppTheme.slate600,
         ),
         title: Text(
           label,
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? const Color(0xFF1A73E8) : const Color(0xFF1A1A2E),
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppTheme.primaryColor : AppTheme.slate800,
           ),
         ),
         trailing: isSelected
             ? Container(
                 width: 3,
-                height: 24,
+                height: 20,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A73E8),
+                  color: AppTheme.primaryColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               )
