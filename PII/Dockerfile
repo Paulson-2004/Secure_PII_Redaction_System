@@ -26,12 +26,13 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads/redacted
 
-# Expose port
-EXPOSE 5000
+# Expose port (Render defaults to 10000 for web services)
+EXPOSE 10000
 
 # Set environment variables
 ENV FLASK_ENV=production
 ENV FLASK_APP=app.py
+ENV PORT=10000
 
 # Run the application with Gunicorn
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120 app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120 app:app"]
