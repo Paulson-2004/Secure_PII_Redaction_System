@@ -11,21 +11,25 @@ AI Architecture:
 
 import math
 import logging
+import threading
+import importlib.util
 from collections import Counter
 
 logger = logging.getLogger('rag_decision_engine')
 
-# Attempt imports for high-dimensional vector search
+# Module-level placeholders for lazy loading (allows unittests to patch SentenceTransformer)
+SentenceTransformer = None
+faiss = None
+
+# Check dependency availability without eagerly loading heavy PyTorch weights into memory
 try:
-    from sentence_transformers import SentenceTransformer
-    EMBEDDINGS_AVAILABLE = True
-except ImportError:
+    EMBEDDINGS_AVAILABLE = importlib.util.find_spec('sentence_transformers') is not None
+except Exception:
     EMBEDDINGS_AVAILABLE = False
 
 try:
-    import faiss
-    FAISS_AVAILABLE = True
-except ImportError:
+    FAISS_AVAILABLE = importlib.util.find_spec('faiss') is not None
+except Exception:
     FAISS_AVAILABLE = False
 
 
@@ -167,7 +171,8 @@ def _tokenize(text):
 
 class RAGDecisionEngine:
     """
-    RAG Policy Decision Engine with FAISS vector search, batch caching, and TF-IDF fallback.
+    RAG Policy Decision Engine with fast deterministic direct matching,
+    lazy on-demand FAISS vector search, batch caching, and TF-IDF fallback.
     """
 
     def __init__(self):
@@ -176,22 +181,55 @@ class RAGDecisionEngine:
         self.embedding_model = None
         self.faiss_index = None
         self.use_rag = False
+        self._rag_initialized = False
+        self._rag_init_failed = False
+        self._init_lock = threading.Lock()
         self._embedding_cache = {}
         self._tfidf_docs = []
         self._vocab = set()
 
-        self._initialize()
+        self._build_deterministic_index()
 
-    def _initialize(self):
-        """Initialize FAISS vector store or setup TF-IDF fallback vocabulary."""
-        # Setup fallback search vocabulary
+    def _build_deterministic_index(self):
+        """Build lightweight deterministic policy index and TF-IDF fallback vocabulary immediately."""
+        self._tfidf_docs = []
+        self._vocab = set()
         for p in self.policies:
             tokens = _tokenize(f"{p['pii_type']} {p['policy_text']} {p['regulation']}")
             self._tfidf_docs.append((p, Counter(tokens)))
             self._vocab.update(tokens)
 
-        if EMBEDDINGS_AVAILABLE and FAISS_AVAILABLE:
+    def _initialize(self):
+        """Backward-compatibility hook: ensures deterministic policy index is built."""
+        self._build_deterministic_index()
+
+    def _ensure_semantic_engine(self):
+        """
+        Lazily initialize SentenceTransformer and FAISS vector index on demand.
+        Thread-safe for multi-threaded Gunicorn workers (1 worker / 4 threads).
+        """
+        if self._rag_initialized or self._rag_init_failed:
+            return self.use_rag
+
+        with self._init_lock:
+            if self._rag_initialized or self._rag_init_failed:
+                return self.use_rag
+
+            if not (EMBEDDINGS_AVAILABLE and FAISS_AVAILABLE):
+                self.use_rag = False
+                self._rag_init_failed = True
+                return False
+
+            global SentenceTransformer, faiss
             try:
+                if SentenceTransformer is None:
+                    from sentence_transformers import SentenceTransformer as _ST
+                    SentenceTransformer = _ST
+                if faiss is None:
+                    import faiss as _faiss
+                    faiss = _faiss
+
+                logger.info("Initializing lazy SentenceTransformer and FAISS index for semantic retrieval...")
                 self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
                 texts = [f"{p['pii_type']}: {p['policy_text']}" for p in self.policies]
                 embeddings = self.embedding_model.encode(texts)
@@ -200,12 +238,14 @@ class RAGDecisionEngine:
                 self.faiss_index = faiss.IndexFlatL2(dimension)
                 self.faiss_index.add(embeddings.astype('float32'))
                 self.use_rag = True
+                self._rag_initialized = True
                 logger.info("RAG Engine online: %d policies indexed in FAISS", len(self.policies))
+                return True
             except Exception as e:
-                logger.warning("RAG FAISS initialization failed (%s). Using semantic fallback.", e)
+                logger.warning("RAG FAISS lazy initialization failed (%s). Using semantic fallback.", e)
                 self.use_rag = False
-        else:
-            self.use_rag = False
+                self._rag_init_failed = True
+                return False
 
     def _retrieve_tfidf_fallback(self, query):
         """Lightweight semantic similarity fallback using token vector cosine similarity."""
@@ -232,6 +272,13 @@ class RAGDecisionEngine:
         """
         Evaluate redaction decision for a single PII entity.
 
+        Fast path: Check direct_policy (e.g. AADHAAR, PAN, PHONE, etc.).
+        If found, return deterministic regulatory decision immediately.
+        SentenceTransformer and FAISS are NOT loaded.
+
+        Slow path: For unknown/unmapped PII types, lazily initialize
+        SentenceTransformer/FAISS or fall back to TF-IDF semantic matching.
+
         Args:
             pii_detection: dict with keys {type, value, confidence, ...}
 
@@ -243,8 +290,22 @@ class RAGDecisionEngine:
 
         # Fast deterministic lookup if exact policy exists
         direct_policy = self.policy_by_type.get(pii_type)
+        if direct_policy:
+            return {
+                'action': direct_policy.get('action', 'FULL_REDACT'),
+                'severity': direct_policy.get('severity', 'HIGH'),
+                'regulation': direct_policy.get('regulation', 'Standard Privacy Policy'),
+                'policy_id': direct_policy.get('id', 'POL-DEFAULT'),
+                'policy_text': direct_policy.get('policy_text', ''),
+                'mask_format': direct_policy.get('mask_format'),
+                'retrieval_distance': 0.0,
+                'engine': 'RULE_POLICY'
+            }
 
-        if self.use_rag:
+        # Unknown / unmapped PII type -> lazy semantic retrieval on demand
+        rag_ready = self._ensure_semantic_engine()
+
+        if rag_ready and self.embedding_model is not None and self.faiss_index is not None:
             query = f"Privacy policy and redaction rules for {pii_type} with value {pii_val}"
             try:
                 if query not in self._embedding_cache:
@@ -257,35 +318,26 @@ class RAGDecisionEngine:
                 best_idx = indices[0][0]
                 dist = float(distances[0][0])
                 retrieved_policy = self.policies[best_idx]
-
-                # Semantic verification: if retrieved policy matches type or is close
-                if retrieved_policy['pii_type'] == pii_type or direct_policy is None:
-                    policy = retrieved_policy
-                else:
-                    policy = direct_policy
-
+                policy = retrieved_policy
                 engine_mode = 'RAG_FAISS'
             except Exception:
-                policy = direct_policy or self.policies[0]
-                dist = 0.0
+                retrieved, score = self._retrieve_tfidf_fallback(f"{pii_type} {pii_val}")
+                policy = retrieved or self.policies[0]
+                dist = 1.0 - score if score > 0 else 1.0
                 engine_mode = 'FALLBACK_DIRECT'
         else:
-            if direct_policy:
-                policy = direct_policy
-                dist = 0.0
-                engine_mode = 'RULE_POLICY'
-            else:
-                retrieved, score = self._retrieve_tfidf_fallback(f"{pii_type} {pii_val}")
-                policy = retrieved or {
-                    "pii_type": pii_type,
-                    "action": "FULL_REDACT",
-                    "severity": "HIGH",
-                    "regulation": "Default Privacy Baseline",
-                    "policy_text": "Uncategorized sensitive data default redaction.",
-                    "id": "POL-DEF"
-                }
-                dist = 1.0 - score if score > 0 else 1.0
-                engine_mode = 'SEMANTIC_FALLBACK'
+            # Deterministic TF-IDF semantic fallback
+            retrieved, score = self._retrieve_tfidf_fallback(f"{pii_type} {pii_val}")
+            policy = retrieved or {
+                "pii_type": pii_type,
+                "action": "FULL_REDACT",
+                "severity": "HIGH",
+                "regulation": "Default Privacy Baseline",
+                "policy_text": "Uncategorized sensitive data default redaction.",
+                "id": "POL-DEF"
+            }
+            dist = 1.0 - score if score > 0 else 1.0
+            engine_mode = 'SEMANTIC_FALLBACK'
 
         return {
             'action': policy.get('action', 'FULL_REDACT'),
@@ -316,19 +368,22 @@ class RAGDecisionEngine:
 
     def get_engine_status(self):
         """Return engine operational status for API diagnostics."""
+        is_semantic_loaded = self._rag_initialized and self.embedding_model is not None
         return {
             'status': 'initialized',
-            'rag_enabled': self.use_rag,
+            'rag_enabled': EMBEDDINGS_AVAILABLE and FAISS_AVAILABLE,
             'initialized': True,
+            'embeddings_loaded': is_semantic_loaded,
             'total_policies': len(self.policies),
-            'embedding_model': 'all-MiniLM-L6-v2' if self.use_rag else 'TF-IDF-Cosine-Fallback',
-            'vector_db': 'FAISS' if self.use_rag else 'Embedded-Semantic-Index',
+            'embedding_model': 'all-MiniLM-L6-v2' if is_semantic_loaded else 'lazy_on_demand',
+            'vector_db': 'FAISS' if is_semantic_loaded else 'Embedded-Policy-Index',
             'index_size': self.faiss_index.ntotal if self.faiss_index else len(self.policies)
         }
 
 
-# Singleton instance
+# Singleton instance with thread-safe lock
 _engine = None
+_engine_lock = threading.Lock()
 
 
 def get_rag_status_lightweight():
@@ -348,7 +403,9 @@ def get_rag_engine():
     """Retrieve or construct the global RAG decision engine singleton."""
     global _engine
     if _engine is None:
-        _engine = RAGDecisionEngine()
+        with _engine_lock:
+            if _engine is None:
+                _engine = RAGDecisionEngine()
     return _engine
 
 
