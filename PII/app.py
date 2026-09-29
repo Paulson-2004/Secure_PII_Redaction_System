@@ -121,14 +121,26 @@ frontend_url = app.config.get('FRONTEND_URL') or os.getenv('FRONTEND_URL')
 if frontend_url:
     for u in frontend_url.split(','):
         u_clean = u.strip().rstrip('/')
-        if u_clean and u_clean not in cors_origins:
-            cors_origins.append(u_clean)
+        if u_clean:
+            if '*' in u_clean:
+                regex_pattern = re.compile(
+                    r"^" + re.escape(u_clean).replace(r"\*", r".*") + r"$"
+                )
+                cors_origins.append(regex_pattern)
+            elif u_clean not in cors_origins:
+                cors_origins.append(u_clean)
 custom_cors = app.config.get('CORS_ALLOWED_ORIGINS') or os.getenv('CORS_ALLOWED_ORIGINS')
 if custom_cors:
     for u in custom_cors.split(','):
         u_clean = u.strip().rstrip('/')
-        if u_clean and u_clean not in cors_origins:
-            cors_origins.append(u_clean)
+        if u_clean:
+            if '*' in u_clean:
+                regex_pattern = re.compile(
+                    r"^" + re.escape(u_clean).replace(r"\*", r".*") + r"$"
+                )
+                cors_origins.append(regex_pattern)
+            elif u_clean not in cors_origins:
+                cors_origins.append(u_clean)
 
 # Enable CORS for Flutter Web & Mobile clients
 CORS(

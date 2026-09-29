@@ -186,6 +186,34 @@ class TestAPISecurity(unittest.TestCase):
                 except OSError:
                     pass
 
+    def test_08_cors_wildcard_matching(self):
+        """Verify CORS wildcard regex transformation and matching behavior."""
+        import re
+        from flask_cors.core import try_match
+
+        wildcard_entry = "https://*.vercel.app"
+        regex_pattern = re.compile(r"^" + re.escape(wildcard_entry).replace(r"\*", r".*") + r"$")
+
+        # 1. Matches Vercel production origin
+        self.assertIsNotNone(try_match('https://privlock.vercel.app', regex_pattern))
+
+        # 2. Matches Vercel preview origin
+        self.assertIsNotNone(try_match('https://my-app.vercel.app', regex_pattern))
+
+        # 3. Rejects unrelated domain
+        self.assertIsNone(try_match('https://example.com', regex_pattern))
+
+        # 4. Rejects attacker domain with suffix
+        self.assertIsNone(try_match('https://malicious-vercel.app.attacker.com', regex_pattern))
+
+        # 5. Localhost matches base app preflight
+        res_local = self.client.options(
+            '/api/health',
+            headers={'Origin': 'http://localhost:5080', 'Access-Control-Request-Method': 'GET'}
+        )
+        self.assertEqual(res_local.status_code, 200)
+        self.assertEqual(res_local.headers.get('Access-Control-Allow-Origin'), 'http://localhost:5080')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,14 +1,12 @@
 services:
   - type: web
     name: privlock-api
-    runtime: python
-    rootDir: PII
+    runtime: docker
+    dockerContext: ./PII
+    dockerfilePath: ./PII/Dockerfile
     plan: free
-    buildCommand: "pip install -r requirements.txt && python -m spacy download en_core_web_sm"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120"
+    healthCheckPath: /api/health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: FLASK_ENV
         value: production
       - key: USE_SQLITE
