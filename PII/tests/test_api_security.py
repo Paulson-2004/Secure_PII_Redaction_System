@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 import json
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -213,6 +214,44 @@ class TestAPISecurity(unittest.TestCase):
         )
         self.assertEqual(res_local.status_code, 200)
         self.assertEqual(res_local.headers.get('Access-Control-Allow-Origin'), 'http://localhost:5080')
+
+    def test_09_health_check_lightweight_no_rag_init(self):
+        """Verify /api/health is lightweight and does NOT instantiate RAG engine or SentenceTransformer."""
+        from unittest.mock import patch
+        import modules.rag_decision_engine as rag_mod
+
+        # Ensure singleton is reset for clean verification
+        original_engine = rag_mod._engine
+        rag_mod._engine = None
+
+        try:
+            with patch('modules.rag_decision_engine.get_rag_engine') as mock_get_rag, \
+                 patch('modules.rag_decision_engine.SentenceTransformer') as mock_st:
+                t0 = time.time()
+                res = self.client.get('/api/health')
+                duration = time.time() - t0
+
+                self.assertEqual(res.status_code, 200)
+                data = res.get_json()
+                self.assertTrue(data.get('success'))
+                health = data.get('data', {})
+                self.assertEqual(health.get('backend'), 'running')
+                self.assertIn('database', health)
+                self.assertIn('ai', health)
+
+                rag_info = health['ai'].get('rag', {})
+                self.assertEqual(rag_info.get('status'), 'ready_lazy')
+                self.assertTrue(rag_info.get('rag_enabled'))
+                self.assertFalse(rag_info.get('initialized'))
+
+                # Prove that neither get_rag_engine nor SentenceTransformer was invoked
+                mock_get_rag.assert_not_called()
+                mock_st.assert_not_called()
+
+                # Health check should respond extremely quickly (< 1.0 second)
+                self.assertLess(duration, 1.0)
+        finally:
+            rag_mod._engine = original_engine
 
 
 if __name__ == '__main__':

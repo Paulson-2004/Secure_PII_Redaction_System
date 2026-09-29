@@ -48,7 +48,7 @@ try:
     from modules.regex_detector import detect_pii_regex, get_pattern_summary
     from modules.ner_detector import detect_pii_ner, get_ner_model_info
     from modules.hybrid_engine import detect_pii_hybrid
-    from modules.rag_decision_engine import decide_redaction, get_rag_engine
+    from modules.rag_decision_engine import decide_redaction, get_rag_engine, get_rag_status_lightweight
     from modules.redaction_engine import (
         process_redaction,
         save_redacted_pdf_pages,
@@ -190,7 +190,7 @@ def health_check():
             ai_status['regex'] = get_pattern_summary()
             ai_status['ner'] = get_ner_model_info()
             ai_status['hybrid'] = {'loaded': True}
-            ai_status['rag'] = get_rag_engine().get_engine_status()
+            ai_status['rag'] = get_rag_status_lightweight()
             ai_status['redaction'] = {'loaded': True}
         except Exception as e:
             ai_status['error'] = str(e)

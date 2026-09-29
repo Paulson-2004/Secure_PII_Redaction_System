@@ -317,7 +317,9 @@ class RAGDecisionEngine:
     def get_engine_status(self):
         """Return engine operational status for API diagnostics."""
         return {
+            'status': 'initialized',
             'rag_enabled': self.use_rag,
+            'initialized': True,
             'total_policies': len(self.policies),
             'embedding_model': 'all-MiniLM-L6-v2' if self.use_rag else 'TF-IDF-Cosine-Fallback',
             'vector_db': 'FAISS' if self.use_rag else 'Embedded-Semantic-Index',
@@ -327,6 +329,19 @@ class RAGDecisionEngine:
 
 # Singleton instance
 _engine = None
+
+
+def get_rag_status_lightweight():
+    """Return lightweight RAG status without instantiating or initializing the engine."""
+    global _engine
+    if _engine is not None:
+        return _engine.get_engine_status()
+    return {
+        'status': 'ready_lazy',
+        'rag_enabled': EMBEDDINGS_AVAILABLE and FAISS_AVAILABLE,
+        'initialized': False,
+        'total_policies': len(PRIVACY_POLICIES),
+    }
 
 
 def get_rag_engine():

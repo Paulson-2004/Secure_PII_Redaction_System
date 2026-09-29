@@ -4,7 +4,7 @@ from .ocr_engine import get_full_text_and_boxes
 from .regex_detector import detect_pii_regex, get_pattern_summary
 from .ner_detector import detect_pii_ner, get_ner_model_info
 from .hybrid_engine import detect_pii_hybrid
-from .rag_decision_engine import decide_redaction, get_rag_engine
+from .rag_decision_engine import decide_redaction, get_rag_engine, get_rag_status_lightweight
 from .redaction_engine import process_redaction
 
 __all__ = [
@@ -16,5 +16,6 @@ __all__ = [
 	'detect_pii_hybrid',
 	'decide_redaction',
 	'get_rag_engine',
+	'get_rag_status_lightweight',
 	'process_redaction',
 ]
