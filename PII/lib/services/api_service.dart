@@ -7,16 +7,25 @@ import 'web_download_stub.dart'
   if (dart.library.html) 'web_download_web.dart';
 
 class ApiService {
-  // Override with --dart-define=API_BASE_URL=http://<host>:5000 when needed.
-  // Defaults are chosen per platform so the app works on emulators and local desktop.
+  static const String productionApiUrl =
+      'https://secure-pii-redaction-system.onrender.com';
+  static const String localApiUrl = 'http://127.0.0.1:5000';
+
+  // Override with --dart-define=API_BASE_URL=https://<host> when needed.
+  // Defaults are chosen per platform and build mode:
+  // - Web in release mode uses production Render backend
+  // - Web in debug/local development uses local Flask backend
+  // - Emulators/desktop default to appropriate local addresses
   static String get baseUrl {
     const override = String.fromEnvironment('API_BASE_URL', defaultValue: '');
     if (override.isNotEmpty) {
-      return override;
+      return override.endsWith('/')
+          ? override.substring(0, override.length - 1)
+          : override;
     }
 
     if (kIsWeb) {
-      return 'http://127.0.0.1:5000';
+      return kReleaseMode ? productionApiUrl : localApiUrl;
     }
 
     if (Platform.isAndroid) {
@@ -27,7 +36,7 @@ class ApiService {
       return 'http://localhost:5000';
     }
 
-    return 'http://127.0.0.1:5000';
+    return localApiUrl;
   }
   static const String fingerprintToken = 'device_fingerprint_token';
   static String? _sessionCookieValue;
