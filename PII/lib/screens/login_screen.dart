@@ -58,8 +58,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Image.asset('assets/images/privlock_logo.png',
-                      fit: BoxFit.contain),
+                  child: Image.asset(
+                    'assets/images/privlock_logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.shield_outlined,
+                            color: Color(0xFF1A73E8), size: 36),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -150,20 +155,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Login button
                     Consumer<AuthProvider>(
-                      builder: (_, auth, __) => ElevatedButton(
-                        onPressed: auth.isLoading ? null : _login,
-                        child: auth.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Text('Sign In'),
+                      builder: (_, auth, __) => SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: ElevatedButton(
+                          onPressed: auth.isLoading ? null : _login,
+                          child: auth.isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Text('Sign In'),
+                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
                     // Register link
                     Row(
@@ -186,13 +195,125 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // Divider with OR
+                    Row(
+                      children: [
+                        const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade500,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                      ],
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // Continue as Guest button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final auth = context.read<AuthProvider>();
+                          auth.continueAsGuest();
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                                builder: (_) => const DashboardScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.flash_on_outlined,
+                            size: 18, color: Color(0xFF1A73E8)),
+                        label: const Text(
+                          'Continue as Guest',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFD1D5DB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          backgroundColor: const Color(0xFFF9FAFB),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Center(
+                      child: Text(
+                        'Redact documents instantly without registering. No personal information required.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 48),
+              const SizedBox(height: 36),
 
-              // Info box
+              // Account benefits callout
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.history_toggle_off_outlined,
+                        color: Color(0xFF16A34A), size: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Want to keep your redaction history?',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF15803D),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Create a free account to save and access your previous redactions, maintain compliance audit trails, and enable biometric security.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF166534),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Supported Documents Info box
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -215,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Aadhaar Card • PAN Card • Driving License • Voter ID',
+                      'Aadhaar Card • PAN Card • Driving License • Voter ID • Passports',
                       style: TextStyle(
                           color: Color(0xFF374151), fontSize: 13, height: 1.5),
                     ),

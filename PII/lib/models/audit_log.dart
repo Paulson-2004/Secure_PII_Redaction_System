@@ -20,7 +20,6 @@ class AuditLog {
   factory AuditLog.fromJson(Map<String, dynamic> json) {
     final filename = json['filename'] ??
         json['original_filename'] ??
-        json['action'] ??
         'Document';
     final docType = json['document_type'] ?? json['doc_type'] ?? 'general';
     final piiCount = (json['pii_count'] as num?)?.toInt() ?? 0;

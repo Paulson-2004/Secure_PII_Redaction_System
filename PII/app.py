@@ -42,6 +42,29 @@ logger = logging.getLogger('app')
 # In-memory authentication token store with timestamp tracking
 AUTH_TOKENS = {}
 
+# In-memory ephemeral registry for guest-processed document artifacts with TTL tracking
+GUEST_ARTIFACTS = {}
+GUEST_ARTIFACT_TTL = datetime.timedelta(hours=1)
+
+
+def _cleanup_expired_guest_artifacts():
+    """Remove expired guest document files from disk and memory registry."""
+    now = datetime.datetime.now()
+    expired_keys = [
+        k for k, v in list(GUEST_ARTIFACTS.items())
+        if now - v.get('created_at', now) > GUEST_ARTIFACT_TTL
+    ]
+    for k in expired_keys:
+        artifact = GUEST_ARTIFACTS.pop(k, None)
+        if artifact:
+            for p in (artifact.get('filepath'), artifact.get('redacted_path')):
+                if p and os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except OSError as e:
+                        logger.warning("Failed to remove expired guest file %s: %s", p, e)
+
+
 # Import AI modules
 try:
     from modules.ocr_engine import get_full_text_and_boxes, get_pdf_pages_data
@@ -336,8 +359,7 @@ def process_document():
     6. Log audit event and document metadata
     """
     user_id = _get_current_user_id()
-    if not user_id:
-        return error_response('Unauthorized: Please login first', 401)
+    is_guest = (user_id is None)
 
     if not AI_MODULES_LOADED:
         return error_response('AI processing modules unavailable. Please check configuration.', 500)
@@ -348,6 +370,50 @@ def process_document():
     file = request.files['file']
     doc_type = request.form.get('doc_type', 'general').strip().lower()
     action = request.form.get('action', 'redact').strip().lower()
+    detection_mode = request.form.get('detection_mode', 'automatic').strip().lower()
+    if detection_mode not in ('automatic', 'manual', 'automatic_manual'):
+        detection_mode = 'automatic'
+
+    # Parse and validate manual selection regions
+    raw_manual_regions = request.form.get('manual_regions', '')
+    manual_regions = []
+    if raw_manual_regions:
+        try:
+            parsed = json.loads(raw_manual_regions) if isinstance(raw_manual_regions, str) else raw_manual_regions
+            if isinstance(parsed, list):
+                for r in parsed[:50]:  # Cap at 50 regions for security & performance
+                    if isinstance(r, dict):
+                        try:
+                            p_idx = int(r.get('page', 1))
+                            if p_idx < 1:
+                                p_idx = 1
+                            x_val = float(r.get('x', 0.0))
+                            y_val = float(r.get('y', 0.0))
+                            w_val = float(r.get('width', r.get('w', 0.0)))
+                            h_val = float(r.get('height', r.get('h', 0.0)))
+
+                            # Clamp normalized coordinates to [0.0, 1.0]
+                            cx = max(0.0, min(1.0, x_val))
+                            cy = max(0.0, min(1.0, y_val))
+                            cw = max(0.001, min(1.0 - cx, w_val))
+                            ch = max(0.001, min(1.0 - cy, h_val))
+
+                            reg_action = str(r.get('action') or action).lower()
+                            if reg_action not in ('redact', 'mask', 'blur'):
+                                reg_action = action
+
+                            manual_regions.append({
+                                'page': p_idx,
+                                'x': round(cx, 4),
+                                'y': round(cy, 4),
+                                'width': round(cw, 4),
+                                'height': round(ch, 4),
+                                'action': reg_action
+                            })
+                        except (ValueError, TypeError):
+                            continue
+        except Exception as e:
+            logger.warning("Error parsing manual_regions: %s", e)
 
     if not file or file.filename == '':
         return error_response('No file selected', 400)
@@ -366,7 +432,12 @@ def process_document():
     os.makedirs(redacted_dir, exist_ok=True)
 
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"{user_id}_{timestamp}_{original_name}"
+    if is_guest:
+        guest_token = secrets.token_hex(16)
+        filename = f"guest_{guest_token}_{timestamp}_{original_name}"
+    else:
+        guest_token = None
+        filename = f"{user_id}_{timestamp}_{original_name}"
     filepath = os.path.join(uploads_dir, filename)
 
     start_proc_time = time.time()
@@ -410,6 +481,8 @@ def process_document():
                 p_orig_img = page['original_image']
                 all_extracted_text_parts.append(f"--- Page {page_idx + 1} ---\n{p_text}")
 
+                page_manual_regions = [r for r in manual_regions if r.get('page') == page_idx + 1]
+
                 # Hybrid PII Detection on page text
                 p_hybrid = detect_pii_hybrid(p_text)
                 p_detections = p_hybrid.get('detections', [])
@@ -429,10 +502,18 @@ def process_document():
                     p_enriched = p_detections
                     rag_status = {'rag_enabled': False, 'error': str(e)}
 
-                if action in ('mask', 'blur'):
+                if action == 'mask':
                     for d in p_enriched:
                         if d.get('decision') != 'KEEP':
                             d['decision'] = 'PARTIAL_MASK'
+                elif action == 'blur':
+                    for d in p_enriched:
+                        if d.get('decision') != 'KEEP':
+                            d['decision'] = 'BLUR'
+                elif action == 'redact':
+                    for d in p_enriched:
+                        if d.get('decision') != 'KEEP':
+                            d['decision'] = 'FULL_REDACT'
 
                 # Annotate detections with 1-indexed page number
                 for d in p_enriched:
@@ -445,12 +526,22 @@ def process_document():
                     d_copy['page'] = page_idx + 1
                     all_raw_detections.append(d_copy)
 
-                # Visual redaction for this page
-                p_redacted_img = redact_image(p_orig_img, p_enriched, p_words)
-                page_redacted_images.append(p_redacted_img)
+                # Visual and text redaction for this page according to detection_mode
+                if detection_mode == 'manual':
+                    if page_manual_regions:
+                        p_redacted_img = redact_image(p_orig_img, detections=[], ocr_words=[], manual_regions=page_manual_regions)
+                    else:
+                        p_redacted_img = p_orig_img.copy()
+                    p_redacted_text = p_text
+                elif detection_mode == 'automatic_manual':
+                    p_redacted_img = redact_image(p_orig_img, p_enriched, p_words, manual_regions=page_manual_regions)
+                    p_redacted_text = redact_text(p_text, p_enriched)
+                else:
+                    # 'automatic'
+                    p_redacted_img = redact_image(p_orig_img, p_enriched, p_words)
+                    p_redacted_text = redact_text(p_text, p_enriched)
 
-                # Text redaction for this page
-                p_redacted_text = redact_text(p_text, p_enriched)
+                page_redacted_images.append(p_redacted_img)
                 all_redacted_text_parts.append(f"--- Page {page_idx + 1} ---\n{p_redacted_text}")
 
             # Reconstruct multi-page redacted PDF preserving original page count and order
@@ -460,13 +551,23 @@ def process_document():
             partial_masked = sum(1 for d in all_enriched_detections if d.get('decision') == 'PARTIAL_MASK')
             kept = sum(1 for d in all_enriched_detections if d.get('decision') == 'KEEP')
 
+            if detection_mode == 'manual':
+                full_redacted = sum(1 for r in manual_regions if r.get('action') == 'redact')
+                partial_masked = sum(1 for r in manual_regions if r.get('action') == 'mask')
+                blurred = sum(1 for r in manual_regions if r.get('action') == 'blur')
+                total_reported = len(manual_regions)
+            else:
+                blurred = sum(1 for d in all_enriched_detections if d.get('decision') == 'BLUR')
+                total_reported = len(all_enriched_detections)
+
             redaction_results = {
                 'redacted_text': '\n\n'.join(all_redacted_text_parts),
                 'redacted_image_path': redacted_path,
                 'summary': {
-                    'total_pii': len(all_enriched_detections),
+                    'total_pii': total_reported,
                     'full_redacted': full_redacted,
                     'partial_masked': partial_masked,
+                    'blurred': blurred if 'blurred' in locals() else 0,
                     'kept': kept
                 }
             }
@@ -502,19 +603,38 @@ def process_document():
                 enriched_detections = pii_detections
                 rag_status = {'rag_enabled': False, 'error': str(e)}
 
-            # Override decision if user explicitly requested 'mask' or 'blur' action
-            if action in ('mask', 'blur'):
+            # Override decision if user explicitly requested specific action
+            if action == 'mask':
                 for d in enriched_detections:
                     if d.get('decision') != 'KEEP':
                         d['decision'] = 'PARTIAL_MASK'
+            elif action == 'blur':
+                for d in enriched_detections:
+                    if d.get('decision') != 'KEEP':
+                        d['decision'] = 'BLUR'
+            elif action == 'redact':
+                for d in enriched_detections:
+                    if d.get('decision') != 'KEEP':
+                        d['decision'] = 'FULL_REDACT'
 
-            # Step 4: Redaction Engine - Apply Text Masking and Visual Image Redaction
+            # Step 4: Redaction Engine - Apply Text Masking and Visual Image Redaction according to detection_mode
+            if detection_mode == 'manual':
+                active_detections = []
+                active_manual_regions = manual_regions
+            elif detection_mode == 'automatic_manual':
+                active_detections = enriched_detections
+                active_manual_regions = manual_regions
+            else:
+                active_detections = enriched_detections
+                active_manual_regions = None
+
             redaction_results = process_redaction(
                 extracted_text,
                 original_image,
                 word_boxes,
-                enriched_detections,
-                redacted_path
+                active_detections,
+                redacted_path,
+                manual_regions=active_manual_regions
             )
 
         elapsed_time = round(time.time() - start_proc_time, 2)
@@ -532,22 +652,35 @@ def process_document():
             for d in enriched_detections
         ]
 
-        # Step 5: Save audit trail in database
-        record_document_log(
-            user_id=user_id,
-            filename=redacted_filename,
-            original_filename=file.filename,
-            doc_type=doc_type,
-            status='processed',
-            file_path=redacted_path,
-            pii_detected=pii_types
-        )
-        log_audit(
-            user_id,
-            'pii_document_processed',
-            f'Processed {doc_type} ({file.filename}): {len(pii_detections)} PII elements identified and redacted in {elapsed_time}s',
-            'success'
-        )
+        # Step 5: Save audit trail in database for authenticated users, or register ephemeral artifact for guests
+        if not is_guest:
+            record_document_log(
+                user_id=user_id,
+                filename=redacted_filename,
+                original_filename=file.filename,
+                doc_type=doc_type,
+                status='processed',
+                file_path=redacted_path,
+                pii_detected=pii_types
+            )
+            log_audit(
+                user_id,
+                'pii_document_processed',
+                f'Processed {doc_type} ({file.filename}) in {detection_mode} mode: {len(pii_detections)} PII, {len(manual_regions)} manual regions in {elapsed_time}s',
+                'success'
+            )
+        else:
+            _cleanup_expired_guest_artifacts()
+            artifact_entry = {
+                'token': guest_token,
+                'filename': filename,
+                'redacted_filename': redacted_filename,
+                'created_at': datetime.datetime.now(),
+                'filepath': filepath,
+                'redacted_path': redacted_path,
+            }
+            GUEST_ARTIFACTS[redacted_filename] = artifact_entry
+            GUEST_ARTIFACTS[filename] = artifact_entry
 
         response_data = {
             'filename': filename,
@@ -555,7 +688,11 @@ def process_document():
             'original_filename': file.filename,
             'doc_type': doc_type,
             'action': action,
+            'detection_mode': detection_mode,
+            'manual_regions_count': len(manual_regions),
+            'manual_regions': manual_regions,
             'status': 'processed',
+            'is_guest': is_guest,
             'page_count': page_count,
             'extracted_text_preview': extracted_text[:300] if extracted_text else '',
             'pii_detected': pii_types,
@@ -563,7 +700,7 @@ def process_document():
             'total_pii_found': len(pii_detections),
             'detection_stats': detection_stats,
             'rag_status': rag_status,
-            'redaction_summary': f"Successfully redacted {len(pii_detections)} PII element(s) under regulatory policy",
+            'redaction_summary': f"Successfully redacted {len(pii_detections)} PII element(s) under regulatory policy" if detection_mode != 'manual' else f"Successfully redacted {len(manual_regions)} user-selected region(s)",
             'redaction_details': redaction_results.get('summary', {}),
             'processing_time': elapsed_time,
             'processed_at': datetime.datetime.now().isoformat()
@@ -573,7 +710,8 @@ def process_document():
 
     except Exception as e:
         logger.error("Document processing error on '%s': %s", filename, e, exc_info=True)
-        log_audit(user_id, 'pii_document_processing_failed', f"Error on {file.filename}: {str(e)}", 'error')
+        if user_id:
+            log_audit(user_id, 'pii_document_processing_failed', f"Error on {file.filename}: {str(e)}", 'error')
         return error_response(f'Failed to process document: {str(e)}', 500)
 
 
@@ -583,43 +721,56 @@ def process_document():
 @app.route('/download/<filename>', methods=['GET'])
 def download_document(filename):
     """
-    Secure document download endpoint with strict path traversal prevention
-    and user ownership isolation.
+    Secure document download endpoint with strict path traversal prevention,
+    user ownership isolation for registered accounts, and secure ephemeral
+    token verification for guests.
     """
-    user_id = _get_current_user_id()
-    if not user_id:
-        return error_response('Unauthorized: Please login first', 401)
-
     clean_filename = secure_filename(filename)
     if not clean_filename or clean_filename != filename:
         return error_response('Invalid filename format', 400)
 
-    # Ownership isolation check: filename must start with user's ID
-    allowed_prefixes = (f"{user_id}_", f"redacted_{user_id}_")
-    if not clean_filename.startswith(allowed_prefixes):
-        return error_response('Access denied: You do not have permission to view this document', 403)
-
     uploads_dir = os.path.abspath(app.config.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads')))
     redacted_dir = os.path.abspath(app.config.get('REDACTED_FOLDER', os.path.join(uploads_dir, 'redacted')))
 
-    if clean_filename.startswith('redacted_'):
-        target_path = os.path.abspath(os.path.join(redacted_dir, clean_filename))
-        base_dir = redacted_dir
+    is_guest_file = clean_filename.startswith(('guest_', 'redacted_guest_'))
+
+    if is_guest_file:
+        _cleanup_expired_guest_artifacts()
+        if clean_filename not in GUEST_ARTIFACTS:
+            return error_response('Document not found or session expired', 404)
+        target_path = GUEST_ARTIFACTS[clean_filename].get(
+            'redacted_path' if clean_filename.startswith('redacted_') else 'filepath'
+        )
+        base_dir = redacted_dir if clean_filename.startswith('redacted_') else uploads_dir
+        user_id = None
     else:
-        target_path = os.path.abspath(os.path.join(uploads_dir, clean_filename))
-        base_dir = uploads_dir
+        user_id = _get_current_user_id()
+        if not user_id:
+            return error_response('Unauthorized: Please login first', 401)
+
+        allowed_prefixes = (f"{user_id}_", f"redacted_{user_id}_")
+        if not clean_filename.startswith(allowed_prefixes):
+            return error_response('Access denied: You do not have permission to view this document', 403)
+
+        if clean_filename.startswith('redacted_'):
+            target_path = os.path.abspath(os.path.join(redacted_dir, clean_filename))
+            base_dir = redacted_dir
+        else:
+            target_path = os.path.abspath(os.path.join(uploads_dir, clean_filename))
+            base_dir = uploads_dir
 
     # Path traversal validation
     try:
         if os.path.commonpath([base_dir, target_path]) != base_dir:
             return error_response('Access denied: Invalid file path', 400)
-    except ValueError:
+    except (ValueError, TypeError):
         return error_response('Access denied: Invalid file path', 400)
 
-    if not os.path.exists(target_path) or not os.path.isfile(target_path):
+    if not target_path or not os.path.exists(target_path) or not os.path.isfile(target_path):
         return error_response('Document not found', 404)
 
-    log_audit(user_id, 'document_downloaded', f'Downloaded: {clean_filename}')
+    if not is_guest_file and user_id:
+        log_audit(user_id, 'document_downloaded', f'Downloaded: {clean_filename}')
     return send_file(target_path, as_attachment=True)
 
 
@@ -631,34 +782,47 @@ def preview_document(filename):
     Secure document preview endpoint with strict path traversal prevention,
     user ownership isolation, and privacy guarantee:
     ONLY redacted output artifacts can be previewed (never the original unredacted document).
+    Supports both authenticated user artifacts and active ephemeral guest artifacts.
     """
-    user_id = _get_current_user_id()
-    if not user_id:
-        return error_response('Unauthorized: Please login first', 401)
-
     clean_filename = secure_filename(filename)
     if not clean_filename or clean_filename != filename:
         return error_response('Invalid filename format', 400)
 
     # CRITICAL PRIVACY & SECURITY CHECK:
-    # Previews MUST ONLY be served for redacted artifacts belonging to the current user!
-    # Original unredacted uploads ({user_id}_...) are strictly forbidden from preview.
-    allowed_prefix = f"redacted_{user_id}_"
-    if not clean_filename.startswith(allowed_prefix):
+    # Previews MUST ONLY be served for redacted artifacts (redacted_...)!
+    # Original unredacted uploads are strictly forbidden from preview.
+    if not clean_filename.startswith('redacted_'):
         return error_response('Access denied: Only processed redacted documents can be previewed', 403)
 
     uploads_dir = os.path.abspath(app.config.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads')))
     redacted_dir = os.path.abspath(app.config.get('REDACTED_FOLDER', os.path.join(uploads_dir, 'redacted')))
-    target_path = os.path.abspath(os.path.join(redacted_dir, clean_filename))
+
+    is_guest_file = clean_filename.startswith('redacted_guest_')
+
+    if is_guest_file:
+        _cleanup_expired_guest_artifacts()
+        if clean_filename not in GUEST_ARTIFACTS:
+            return error_response('Document not found or session expired', 404)
+        target_path = GUEST_ARTIFACTS[clean_filename].get('redacted_path')
+    else:
+        user_id = _get_current_user_id()
+        if not user_id:
+            return error_response('Unauthorized: Please login first', 401)
+
+        allowed_prefix = f"redacted_{user_id}_"
+        if not clean_filename.startswith(allowed_prefix):
+            return error_response('Access denied: Only processed redacted documents can be previewed', 403)
+
+        target_path = os.path.abspath(os.path.join(redacted_dir, clean_filename))
 
     # Path traversal validation
     try:
         if os.path.commonpath([redacted_dir, target_path]) != redacted_dir:
             return error_response('Access denied: Invalid file path', 400)
-    except ValueError:
+    except (ValueError, TypeError):
         return error_response('Access denied: Invalid file path', 400)
 
-    if not os.path.exists(target_path) or not os.path.isfile(target_path):
+    if not target_path or not os.path.exists(target_path) or not os.path.isfile(target_path):
         return error_response('Document not found', 404)
 
     ext = os.path.splitext(clean_filename)[1].lower()
@@ -744,30 +908,6 @@ def get_audit_logs():
                     'processing_time': 0.8,
                     'created_at': created_str,
                 })
-
-        # Step 2: Fallback to raw audit logs if documents table is empty
-        if not results:
-            audit_sql = """
-            SELECT id, action, details, status, created_at
-            FROM audit_logs
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-            LIMIT 100
-            """
-            raw_logs = db.query(audit_sql, (user_id,))
-            if raw_logs:
-                for al in raw_logs:
-                    c_val = al.get('created_at')
-                    c_str = c_val.isoformat() if hasattr(c_val, 'isoformat') else str(c_val or '')
-                    results.append({
-                        'id': al['id'],
-                        'filename': al['action'],
-                        'document_type': 'system_event',
-                        'pii_count': 0,
-                        'action_taken': (al['status'] or 'SUCCESS').upper(),
-                        'processing_time': 0.0,
-                        'created_at': c_str,
-                    })
 
         return success_response('Audit logs retrieved successfully', results, 200)
 

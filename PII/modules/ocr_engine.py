@@ -120,6 +120,8 @@ def _parse_ocr_data(data, processed_img, custom_config):
 
     for i in range(n_boxes):
         raw_text = data['text'][i].strip()
+        # Safe character normalization: normalize non-breaking spaces, zero-width chars, and Unicode hyphens
+        raw_text = raw_text.replace('\u00a0', ' ').replace('\u200b', '').replace('\u2010', '-').replace('\u2013', '-').replace('\u2014', '-').replace('—', '-')
         conf = int(data['conf'][i]) if str(data['conf'][i]).isdigit() or isinstance(data['conf'][i], (int, float)) else -1
 
         line_id = (data.get('block_num', [0])[i], data.get('par_num', [0])[i], data.get('line_num', [0])[i])

@@ -5,7 +5,9 @@ import '../screens/audit_logs_screen.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/pin_fingerprint_setup_screen.dart';
+import '../screens/register_screen.dart';
 import '../theme/app_theme.dart';
+import '../utils/external_launcher.dart';
 import 'change_email_dialog.dart';
 import 'change_password_dialog.dart';
 
@@ -42,8 +44,49 @@ class _AppDrawerState extends State<AppDrawer> {
     }
   }
 
+  void _promptSignInForHistory() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.history_outlined, color: Color(0xFF1A73E8)),
+            SizedBox(width: 8),
+            Text('Redaction History',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: const Text(
+          'Sign in to view your redaction history.\n\n'
+          'Guest documents are ephemeral and not saved to the database. To access permanent audit trails and document history, please sign in or create an account.',
+          style: TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _navigateToAuditLogs() {
     Navigator.pop(context);
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest) {
+      _promptSignInForHistory();
+      return;
+    }
     if (widget.currentRoute != 'history') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const AuditLogsScreen()),
@@ -54,8 +97,9 @@ class _AppDrawerState extends State<AppDrawer> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final initial =
-        (auth.username.isNotEmpty ? auth.username[0] : 'U').toUpperCase();
+    final initial = auth.isGuest
+        ? 'G'
+        : (auth.username.isNotEmpty ? auth.username[0] : 'U').toUpperCase();
 
     return Drawer(
       child: Container(
@@ -87,19 +131,24 @@ class _AppDrawerState extends State<AppDrawer> {
                       border: Border.all(color: Colors.white, width: 2),
                     ),
                     child: Center(
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: auth.isGuest
+                          ? const Icon(Icons.person_outline,
+                              size: 28, color: Colors.white)
+                          : Text(
+                              initial,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    auth.username.isNotEmpty ? auth.username : 'User',
+                    auth.isGuest
+                        ? 'Guest User'
+                        : (auth.username.isNotEmpty ? auth.username : 'User'),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -110,7 +159,11 @@ class _AppDrawerState extends State<AppDrawer> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    auth.email.isNotEmpty ? auth.email : 'PrivLock Operator',
+                    auth.isGuest
+                        ? 'Ephemeral Session'
+                        : (auth.email.isNotEmpty
+                            ? auth.email
+                            : 'PrivLock Operator'),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.white.withValues(alpha: 0.85),
@@ -168,30 +221,55 @@ class _AppDrawerState extends State<AppDrawer> {
             // ──────────────────────────────────────────
             _buildSectionDivider('SECURITY & ACCOUNT'),
 
-            _buildDrawerItem(
-              icon: Icons.lock_reset_outlined,
-              label: 'Change Password',
-              routeName: 'change_password',
-              isSelected: false,
-              onTap: () {
-                Navigator.pop(context);
-                ChangePasswordDialog.show(context);
-              },
-            ),
-
-            _buildDrawerItem(
-              icon: Icons.email_outlined,
-              label: 'Change Email',
-              routeName: 'change_email',
-              isSelected: false,
-              onTap: () {
-                Navigator.pop(context);
-                ChangeEmailDialog.show(context);
-              },
-            ),
-
-            // Expandable Security Settings
-            _buildExpandableSecurity(auth),
+            if (auth.isGuest) ...[
+              _buildDrawerItem(
+                icon: Icons.login_rounded,
+                label: 'Sign In to Account',
+                routeName: 'login',
+                isSelected: false,
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+              ),
+              _buildDrawerItem(
+                icon: Icons.person_add_outlined,
+                label: 'Create Free Account',
+                routeName: 'register',
+                isSelected: false,
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                  );
+                },
+              ),
+            ] else ...[
+              _buildDrawerItem(
+                icon: Icons.lock_reset_outlined,
+                label: 'Change Password',
+                routeName: 'change_password',
+                isSelected: false,
+                onTap: () {
+                  Navigator.pop(context);
+                  ChangePasswordDialog.show(context);
+                },
+              ),
+              _buildDrawerItem(
+                icon: Icons.email_outlined,
+                label: 'Change Email',
+                routeName: 'change_email',
+                isSelected: false,
+                onTap: () {
+                  Navigator.pop(context);
+                  ChangeEmailDialog.show(context);
+                },
+              ),
+              // Expandable Security Settings
+              _buildExpandableSecurity(auth),
+            ],
 
             const SizedBox(height: 16),
 
@@ -203,7 +281,11 @@ class _AppDrawerState extends State<AppDrawer> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   Navigator.pop(context);
-                  await auth.logout();
+                  if (auth.isGuest) {
+                    await auth.clearLocalSession();
+                  } else {
+                    await auth.logout();
+                  }
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -211,8 +293,10 @@ class _AppDrawerState extends State<AppDrawer> {
                     );
                   }
                 },
-                icon: const Icon(Icons.logout, size: 16),
-                label: const Text('Sign Out'),
+                icon: Icon(
+                    auth.isGuest ? Icons.exit_to_app : Icons.logout,
+                    size: 16),
+                label: Text(auth.isGuest ? 'Exit Guest Mode' : 'Sign Out'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.dangerLight,
                   foregroundColor: AppTheme.dangerColor,
@@ -227,8 +311,42 @@ class _AppDrawerState extends State<AppDrawer> {
             const SizedBox(height: 16),
 
             // ──────────────────────────────────────────
-            // APP INFO
+            // VIEW SOURCE & APP INFO
             // ──────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: AppTheme.slate200),
+                ),
+                tileColor: AppTheme.slate50,
+                dense: true,
+                leading: const Icon(Icons.code_rounded, color: AppTheme.slate700, size: 20),
+                title: const Text(
+                  'View Source',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.slate800,
+                  ),
+                ),
+                subtitle: const Text(
+                  'GitHub Repository',
+                  style: TextStyle(fontSize: 10, color: AppTheme.slate500),
+                ),
+                trailing: const Icon(Icons.open_in_new_rounded, size: 14, color: AppTheme.slate400),
+                onTap: () {
+                  Navigator.pop(context);
+                  launchExternalUrl(
+                    'https://github.com/Paulson-2004/Secure_PII_Redaction_System',
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Column(

@@ -1,18 +1,25 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../models/image_display_geometry.dart';
+import '../models/manual_region.dart';
+import '../models/pdf_page_geometry.dart';
 import '../providers/auth_provider.dart';
 import '../providers/document_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/external_launcher.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/pipeline_stepper.dart';
 import '../widgets/privlock_badge.dart';
 import '../widgets/user_avatar_button.dart';
 import 'audit_logs_screen.dart';
+import 'login_screen.dart';
+import 'register_screen.dart';
 import 'result_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -31,8 +38,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   File? _selectedFile;
   Uint8List? _selectedFileBytes;
   String? _selectedFileName;
+  Size? _sourceImageSize;
+  Map<int, Size> _pdfPageSizes = {};
   String _selectedDocType = 'aadhaar';
   String _selectedAction = 'redact';
+  String _selectedDetectionMode = 'automatic';
+  final List<ManualRegion> _manualRegions = [];
+  int _selectedManualPage = 1;
+  int _maxSelectablePages = 5;
+  int _nextRegionId = 1;
+  Offset? _panStartOffset;
+  Offset? _panCurrentOffset;
   final ImagePicker _picker = ImagePicker();
   Map<String, dynamic>? _systemHealth;
   String? _systemHealthError;
@@ -44,12 +60,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadSystemHealth();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<DocumentProvider>().loadAuditLogs();
+        final auth = context.read<AuthProvider>();
+        if (auth.isAuthenticated) {
+          context.read<DocumentProvider>().loadAuditLogs();
+        }
         if (widget.initialAction == 'upload') {
           _scrollToUploadStudio();
         }
       }
     });
+  }
+
+  void _openAuditLogs() {
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.history_outlined, color: Color(0xFF1A73E8)),
+              SizedBox(width: 8),
+              Text('Audit Logs',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          content: const Text(
+            'Sign in to view your redaction history.\n\n'
+            'Guest documents are ephemeral and not saved to the database. To access permanent audit trails and document history, please sign in or create an account.',
+            style: TextStyle(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              },
+              child: const Text('Sign In'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AuditLogsScreen()),
+    );
   }
 
   @override
@@ -126,6 +188,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
+  final List<Map<String, dynamic>> _detectionModes = [
+    {
+      'value': 'automatic',
+      'label': 'Automatic PII Detection',
+      'tag': 'AI Pipeline',
+      'icon': Icons.auto_awesome_outlined,
+      'description': 'Full AI pipeline: OCR + Regex + spaCy NER + Regulatory Policy Engine',
+    },
+    {
+      'value': 'manual',
+      'label': 'Manual Selection',
+      'tag': 'User Regions Only',
+      'icon': Icons.highlight_alt_outlined,
+      'description': 'Redact ONLY regions you explicitly select on the document. Outside text remains untouched.',
+    },
+    {
+      'value': 'automatic_manual',
+      'label': 'Automatic + Manual',
+      'tag': 'Hybrid Combined',
+      'icon': Icons.layers_outlined,
+      'description': 'Combines automated PII detections with your custom manual zones in a single pass.',
+    },
+  ];
+
   final List<Map<String, dynamic>> _aiModules = [
     {
       'name': 'OCR Engine',
@@ -165,6 +251,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
+  Future<void> _resolveSourceImageDimensions([Uint8List? directBytes]) async {
+    try {
+      Uint8List? bytes = directBytes ?? _selectedFileBytes;
+      if (bytes == null && _selectedFile != null) {
+        bytes = await _selectedFile!.readAsBytes();
+      }
+      if (bytes != null && bytes.isNotEmpty) {
+        final image = await decodeImageFromList(bytes);
+        if (mounted) {
+          setState(() {
+            _sourceImageSize = Size(
+              image.width.toDouble(),
+              image.height.toDouble(),
+            );
+          });
+        }
+        image.dispose();
+      }
+    } catch (e) {
+      debugPrint('Could not resolve image dimensions: $e');
+    }
+  }
+
+  Future<void> _resolvePdfPageDimensions([Uint8List? directBytes]) async {
+    try {
+      Uint8List? bytes = directBytes ?? _selectedFileBytes;
+      if (bytes == null && _selectedFile != null) {
+        bytes = await _selectedFile!.readAsBytes();
+      }
+      if (bytes != null && bytes.isNotEmpty) {
+        final parsed = PdfPageGeometryParser.parsePageSizes(bytes);
+        if (mounted) {
+          setState(() {
+            _pdfPageSizes = parsed;
+            if (parsed.isNotEmpty && parsed.length > _maxSelectablePages) {
+              _maxSelectablePages = parsed.length.clamp(1, 20);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Could not parse PDF page dimensions: $e');
+    }
+  }
+
+  Size _getActiveDocumentSize(double canvasWidth, double canvasHeight) {
+    if (_isImageFile()) {
+      return _sourceImageSize ?? Size(canvasWidth, canvasHeight);
+    }
+    if (_isPdfFile()) {
+      if (_pdfPageSizes.containsKey(_selectedManualPage)) {
+        return _pdfPageSizes[_selectedManualPage]!;
+      }
+      if (_pdfPageSizes.containsKey(1)) {
+        return _pdfPageSizes[1]!;
+      }
+      return PdfPagePreset.a4Portrait.size;
+    }
+    return PdfPagePreset.a4Portrait.size;
+  }
+
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -187,6 +334,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final picked = result.files.single;
       setState(() {
         _selectedFileName = picked.name;
+        _manualRegions.clear();
+        _selectedManualPage = 1;
+        _panStartOffset = null;
+        _panCurrentOffset = null;
+        _sourceImageSize = null;
+        _pdfPageSizes = {};
         if (kIsWeb) {
           _selectedFile = null;
           _selectedFileBytes = picked.bytes;
@@ -195,6 +348,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _selectedFile = File(picked.path!);
         }
       });
+      if (_isImageFile()) {
+        if (kIsWeb && picked.bytes != null) {
+          _resolveSourceImageDimensions(picked.bytes);
+        } else if (picked.path != null) {
+          _resolveSourceImageDimensions();
+        }
+      } else if (_isPdfFile()) {
+        if (kIsWeb && picked.bytes != null) {
+          _resolvePdfPageDimensions(picked.bytes);
+        } else if (picked.path != null) {
+          _resolvePdfPageDimensions();
+        }
+      }
     }
   }
 
@@ -205,21 +371,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
       maxWidth: 2048,
     );
     if (image != null) {
+      final bytes = await image.readAsBytes();
       if (kIsWeb) {
-        final bytes = await image.readAsBytes();
         setState(() {
           _selectedFile = null;
           _selectedFileBytes = bytes;
           _selectedFileName = image.name;
+          _manualRegions.clear();
+          _selectedManualPage = 1;
+          _panStartOffset = null;
+          _panCurrentOffset = null;
+          _sourceImageSize = null;
         });
       } else {
         setState(() {
           _selectedFile = File(image.path);
-          _selectedFileBytes = null;
+          _selectedFileBytes = bytes;
           _selectedFileName = image.name;
+          _manualRegions.clear();
+          _selectedManualPage = 1;
+          _panStartOffset = null;
+          _panCurrentOffset = null;
+          _sourceImageSize = null;
         });
       }
+      _resolveSourceImageDimensions(bytes);
     }
+  }
+
+  bool _isImageFile() {
+    final name = _selectedFileName ?? (_selectedFile?.path ?? '');
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext);
+  }
+
+  bool _isPdfFile() {
+    final name = _selectedFileName ?? (_selectedFile?.path ?? '');
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    return ext == 'pdf';
   }
 
   void _showFileSourceSheet() {
@@ -327,6 +516,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    if (_selectedDetectionMode != 'automatic' && _manualRegions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one manual region or switch mode to Automatic.'),
+          backgroundColor: AppTheme.dangerColor,
+        ),
+      );
+      return;
+    }
+
     final docProvider = context.read<DocumentProvider>();
     final success = await docProvider.processDocument(
       file: _selectedFile,
@@ -334,6 +533,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       fileName: _selectedFileName,
       docType: _selectedDocType,
       action: _selectedAction,
+      detectionMode: _selectedDetectionMode,
+      manualRegions: _manualRegions.isNotEmpty
+          ? _manualRegions.map((r) => r.toJson()).toList()
+          : null,
     );
 
     if (success && mounted) {
@@ -367,6 +570,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 32,
@@ -382,33 +586,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'PrivLock',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.slate900,
-                    letterSpacing: -0.3,
+            const Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'PrivLock',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.slate900,
+                      letterSpacing: -0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  'Intelligent PII Detection & Redaction',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.slate500,
+                  Text(
+                    'Intelligent PII Detection & Redaction',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.slate500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           if (screenWidth >= 768) ...[
+            TextButton.icon(
+              onPressed: () => launchExternalUrl(
+                'https://github.com/Paulson-2004/Secure_PII_Redaction_System',
+              ),
+              icon: const Icon(Icons.code_rounded, size: 16),
+              label: const Text('View Source'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.slate600,
+              ),
+            ),
             TextButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.dashboard_outlined, size: 16),
@@ -419,11 +637,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             TextButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AuditLogsScreen()),
-                );
-              },
+              onPressed: _openAuditLogs,
               icon: const Icon(Icons.history_outlined, size: 16),
               label: const Text('Audit Logs'),
               style: TextButton.styleFrom(
@@ -462,7 +676,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Welcome back, ${auth.username.isNotEmpty ? auth.username : 'Analyst'} 👋',
+                            auth.isGuest
+                                ? 'Welcome to PrivLock 👋'
+                                : 'Welcome back, ${auth.username.isNotEmpty ? auth.username : 'Analyst'} 👋',
                             style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
@@ -471,9 +687,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'Upload government IDs or business documents to automatically detect, mask, and redact sensitive PII.',
-                            style: TextStyle(
+                          Text(
+                            auth.isGuest
+                                ? 'Guest Mode: Redact sensitive PII without an account. Upload government IDs or documents to process immediately.'
+                                : 'Upload government IDs or business documents to automatically detect, mask, and redact sensitive PII.',
+                            style: const TextStyle(
                               fontSize: 13,
                               color: AppTheme.slate600,
                             ),
@@ -534,10 +752,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // ── Pipeline Architecture Stepper ───────────────────────────
                 const PipelineStepper(),
+
+                const SizedBox(height: 32),
+
+                // ── Dashboard Footer ─────────────────────────────────────────
+                _buildDashboardFooter(),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Dashboard Footer ───────────────────────────────────────────────────────
+  Widget _buildDashboardFooter() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppTheme.slate200, width: 1)),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 16,
+        runSpacing: 12,
+        children: [
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'PrivLock — Intelligent PII Detection & Redaction System',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.slate800,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'Authoritative Privacy & Security Policy Corpus • Hybrid AI & Manual Redaction',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.slate500,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'PrivLock provides technical privacy/security guidance and automated redaction. It is not legal advice and does not certify regulatory compliance.',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: AppTheme.slate400,
+                ),
+              ),
+            ],
+          ),
+          OutlinedButton.icon(
+            onPressed: () => launchExternalUrl(
+              'https://github.com/Paulson-2004/Secure_PII_Redaction_System',
+            ),
+            icon: const Icon(Icons.code_rounded, size: 16),
+            label: const Text('View Source'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.slate700,
+              side: const BorderSide(color: AppTheme.slate300),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -804,84 +1088,737 @@ class _DashboardScreenState extends State<DashboardScreen> {
           else
             _UploadPlaceholder(onTap: _showFileSourceSheet),
 
+          const SizedBox(height: 22),
+
+          // ── Step 4: Redaction & Detection Mode ──
+          _stepHeader('4', 'Select Detection & Redaction Mode'),
+          const SizedBox(height: 10),
+          _buildDetectionModeSelector(),
+
+          if (_selectedDetectionMode != 'automatic') ...[
+            const SizedBox(height: 22),
+            _stepHeader('5', 'Interactive Manual Selection Studio'),
+            const SizedBox(height: 10),
+            _buildManualSelectionStudio(),
+          ],
+
           const SizedBox(height: 24),
 
-          // ── Step 4: Process Button ──
-          Consumer<DocumentProvider>(
-            builder: (_, docProvider, __) {
-              final canProcess = !docProvider.isProcessing &&
-                  (_selectedFile != null || _selectedFileBytes != null);
+          // ── Process Document Action ──
+          _buildProcessButtonSection(),
+        ],
+      ),
+    );
+  }
 
-              return Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: canProcess ? _processDocument : null,
-                      icon: docProvider.isProcessing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.shield_outlined, size: 18),
-                      label: Text(
-                        docProvider.isProcessing
-                            ? 'Processing Document with AI Pipeline...'
-                            : 'Process & Redact Document',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+  Widget _buildDetectionModeSelector() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _detectionModes.map((dm) {
+            final isSelected = dm['value'] == _selectedDetectionMode;
+            final double width = constraints.maxWidth > 550
+                ? (constraints.maxWidth - (2 * 10)) / 3
+                : constraints.maxWidth;
+
+            return InkWell(
+              onTap: () => setState(() => _selectedDetectionMode = dm['value'] as String),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: width,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.primaryLight : AppTheme.slate50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : AppTheme.slate200,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          dm['icon'] as IconData,
+                          size: 18,
+                          color: isSelected
+                              ? AppTheme.primaryColor
+                              : AppTheme.slate600,
                         ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            dm['label'] as String,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected
+                                  ? AppTheme.primaryColor
+                                  : AppTheme.slate900,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle,
+                              size: 16, color: AppTheme.primaryColor),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dm['description'] as String,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected
+                            ? const Color(0xFF1D4ED8)
+                            : AppTheme.slate500,
+                        height: 1.3,
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: AppTheme.slate200,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildManualSelectionStudio() {
+    final bool hasDocument = _selectedFile != null || _selectedFileBytes != null;
+    final int pageRegionsCount = _manualRegions.where((r) => r.page == _selectedManualPage).length;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.slate50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF93C5FD), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.crop_free_rounded, size: 18, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
+                    const Flexible(
+                      child: Text(
+                        'Interactive Manual Selection Canvas',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.slate900,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_manualRegions.length}/50 zones',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primaryColor,
                         ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              if (_manualRegions.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _manualRegions.clear();
+                      _panStartOffset = null;
+                      _panCurrentOffset = null;
+                    });
+                  },
+                  icon: const Icon(Icons.delete_sweep_outlined, size: 16, color: AppTheme.dangerColor),
+                  label: const Text('Clear All', style: TextStyle(fontSize: 12, color: AppTheme.dangerColor)),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
-                  if (docProvider.isProcessing) ...[
-                    const SizedBox(height: 12),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Click and drag on the canvas to draw rectangular zones to redact, mask, or blur. In Manual mode, only marked zones will be treated.',
+            style: TextStyle(fontSize: 11, color: AppTheme.slate600),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Page Selector (Support Multi-Page PDF & Documents) ──
+          Row(
+            children: [
+              const Text('Target Page:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.slate700)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (int p = 1; p <= _maxSelectablePages; p++)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text('Page $p'),
+                            selected: _selectedManualPage == p,
+                            onSelected: (sel) {
+                              if (sel) setState(() => _selectedManualPage = p);
+                            },
+                            visualDensity: VisualDensity.compact,
+                            labelStyle: TextStyle(
+                              fontSize: 11,
+                              fontWeight: _selectedManualPage == p ? FontWeight.w700 : FontWeight.w500,
+                              color: _selectedManualPage == p ? Colors.white : AppTheme.slate700,
+                            ),
+                            selectedColor: AppTheme.primaryColor,
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                      if (_maxSelectablePages < 20)
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline, size: 20, color: AppTheme.primaryColor),
+                          tooltip: 'Add Page',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => setState(() => _maxSelectablePages++),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Text(
+                'Page $_selectedManualPage: $pageRegionsCount zone(s)',
+                style: const TextStyle(fontSize: 11, color: AppTheme.slate500, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+
+          // ── Detected Page Geometry Badge for PDF & Document Canvas ──
+          if (_isPdfFile() || !_isImageFile()) ...[
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final Size activePageSize = _getActiveDocumentSize(720, 360);
+                final String pageDesc = PdfPagePreset.describeSize(activePageSize);
+                final bool isDetected = _pdfPageSizes.containsKey(_selectedManualPage);
+
+                return Row(
+                  children: [
+                    const Icon(Icons.aspect_ratio_outlined, size: 14, color: AppTheme.slate500),
+                    const SizedBox(width: 6),
+                    const Text('Page Geometry:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.slate700)),
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryLight,
-                        borderRadius: BorderRadius.circular(8),
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFBFDBFE)),
                       ),
-                      child: const Row(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.auto_mode_outlined,
-                              size: 16, color: AppTheme.primaryColor),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'OCR text extraction → Hybrid Regex/NER detection → FAISS policy decision → Redaction generation...',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF1D4ED8),
-                              ),
+                          Icon(
+                            isDetected ? Icons.lock_outline : Icons.description_outlined,
+                            size: 12,
+                            color: AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            isDetected
+                                ? 'Page $_selectedManualPage · $pageDesc'
+                                : 'Page $_selectedManualPage · $pageDesc (Default)',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                ],
-              );
-            },
+                );
+              },
+            ),
+          ],
+          const SizedBox(height: 12),
+
+          // ── Canvas Container ──
+          if (!hasDocument)
+            Container(
+              width: double.infinity,
+              height: 220,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.slate200),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.touch_app_outlined, size: 36, color: AppTheme.slate400),
+                    SizedBox(height: 8),
+                    Text(
+                      'Please select a document first to use the interactive selection canvas.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.slate500),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final double canvasWidth = constraints.maxWidth;
+                const double canvasHeight = 360.0;
+
+                final Size sourceSize = _getActiveDocumentSize(canvasWidth, canvasHeight);
+
+                final geometry = ImageDisplayGeometry(
+                  sourceSize: sourceSize,
+                  containerSize: Size(canvasWidth, canvasHeight),
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                );
+
+                return Container(
+                  width: canvasWidth,
+                  height: canvasHeight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF60A5FA), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Document background positioned strictly within geometry.imageRect
+                      Positioned.fromRect(
+                        rect: geometry.imageRect,
+                        child: _isImageFile()
+                            ? (_selectedFileBytes != null
+                                ? Image.memory(_selectedFileBytes!, fit: BoxFit.fill)
+                                : (_selectedFile != null
+                                    ? Image.file(_selectedFile!, fit: BoxFit.fill)
+                                    : const SizedBox.shrink()))
+                            : _buildDocumentSheetCanvas(
+                                geometry.imageRect.width,
+                                geometry.imageRect.height,
+                              ),
+                      ),
+
+                      // Existing regions for current page mapped back to display pixels
+                      for (final region in _manualRegions.where((r) => r.page == _selectedManualPage))
+                        Positioned.fromRect(
+                          rect: geometry.normalizedToLocalRect(
+                            region.x,
+                            region.y,
+                            region.width,
+                            region.height,
+                          ),
+                          child: _buildRegionOverlay(region),
+                        ),
+
+                      // In-progress drag box clamped to image display rect
+                      if (_panStartOffset != null && _panCurrentOffset != null)
+                        Builder(
+                          builder: (context) {
+                            final double clampedStartX = _panStartOffset!.dx.clamp(geometry.imageRect.left, geometry.imageRect.right);
+                            final double clampedStartY = _panStartOffset!.dy.clamp(geometry.imageRect.top, geometry.imageRect.bottom);
+                            final double clampedCurrX = _panCurrentOffset!.dx.clamp(geometry.imageRect.left, geometry.imageRect.right);
+                            final double clampedCurrY = _panCurrentOffset!.dy.clamp(geometry.imageRect.top, geometry.imageRect.bottom);
+                            final double left = math.min(clampedStartX, clampedCurrX);
+                            final double top = math.min(clampedStartY, clampedCurrY);
+                            final double width = (clampedCurrX - clampedStartX).abs();
+                            final double height = (clampedCurrY - clampedStartY).abs();
+
+                            if (width < 2 || height < 2) return const SizedBox.shrink();
+
+                            return Positioned(
+                              left: left,
+                              top: top,
+                              width: width,
+                              height: height,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor.withValues(alpha: 0.25),
+                                  border: Border.all(color: AppTheme.primaryColor, width: 2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Draw Zone',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      backgroundColor: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                      // Drag gesture detector
+                      GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onPanStart: (details) {
+                          setState(() {
+                            _panStartOffset = details.localPosition;
+                            _panCurrentOffset = details.localPosition;
+                          });
+                        },
+                        onPanUpdate: (details) {
+                          setState(() {
+                            _panCurrentOffset = details.localPosition;
+                          });
+                        },
+                        onPanEnd: (details) {
+                          if (_panStartOffset != null && _panCurrentOffset != null) {
+                            final Rect normRect = geometry.selectionToNormalizedRect(
+                              _panStartOffset!,
+                              _panCurrentOffset!,
+                            );
+
+                            final double pixelW = normRect.width * geometry.imageRect.width;
+                            final double pixelH = normRect.height * geometry.imageRect.height;
+
+                            if (pixelW >= 10 && pixelH >= 10) {
+                              if (_manualRegions.length >= 50) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Maximum 50 manual regions reached.')),
+                                );
+                              } else {
+                                setState(() {
+                                  _manualRegions.add(
+                                    ManualRegion(
+                                      id: _nextRegionId++,
+                                      x: double.parse(normRect.left.toStringAsFixed(4)),
+                                      y: double.parse(normRect.top.toStringAsFixed(4)),
+                                      width: double.parse(normRect.width.toStringAsFixed(4)),
+                                      height: double.parse(normRect.height.toStringAsFixed(4)),
+                                      page: _selectedManualPage,
+                                      action: _selectedAction,
+                                    ),
+                                  );
+                                });
+                              }
+                            }
+                          }
+                          setState(() {
+                            _panStartOffset = null;
+                            _panCurrentOffset = null;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+          if (_manualRegions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _manualRegions.map((r) {
+                return Chip(
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: AppTheme.slate300),
+                  avatar: Icon(
+                    (r.action ?? 'redact') == 'redact'
+                        ? Icons.block
+                        : (r.action ?? 'redact') == 'blur'
+                            ? Icons.blur_on
+                            : Icons.visibility_off,
+                    size: 14,
+                    color: AppTheme.primaryColor,
+                  ),
+                  label: Text(
+                    'P${r.page}: ${(r.action ?? 'redact').toUpperCase()} (${(r.x * 100).toStringAsFixed(0)}%, ${(r.y * 100).toStringAsFixed(0)}%)',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                  ),
+                  onDeleted: () {
+                    setState(() {
+                      _manualRegions.remove(r);
+                    });
+                  },
+                  deleteIconColor: AppTheme.dangerColor,
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegionOverlay(ManualRegion region) {
+    Color bg;
+    String tag;
+    switch ((region.action ?? 'redact').toLowerCase()) {
+      case 'mask':
+        bg = const Color(0xDD0F172A);
+        tag = '****';
+        break;
+      case 'blur':
+        bg = const Color(0xB3475569);
+        tag = 'BLUR';
+        break;
+      case 'redact':
+      default:
+        bg = const Color(0xE6000000);
+        tag = 'REDACT';
+        break;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.white, width: 1),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Text(
+              tag,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _manualRegions.remove(region);
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 8, color: Colors.white),
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDocumentSheetCanvas(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      _isPdfFile()
+                          ? Icons.picture_as_pdf
+                          : Icons.description_outlined,
+                      size: 16,
+                      color: _isPdfFile()
+                          ? AppTheme.dangerColor
+                          : AppTheme.primaryColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _selectedFileName ?? 'Document Page $_selectedManualPage',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.slate800),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.slate100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'PAGE $_selectedManualPage',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.slate600),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 16),
+          for (int i = 0; i < 7; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Container(
+                height: 8,
+                width: (i % 2 == 0) ? double.infinity : width * 0.55,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          const Spacer(),
+          const Center(
+            child: Text(
+              'Drag rectangle anywhere on this page canvas to set redaction bounds',
+              style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AppTheme.slate400),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProcessButtonSection() {
+    return Consumer<DocumentProvider>(
+      builder: (_, docProvider, __) {
+        final canProcess = !docProvider.isProcessing &&
+            (_selectedFile != null || _selectedFileBytes != null) &&
+            (_selectedDetectionMode == 'automatic' || _manualRegions.isNotEmpty);
+
+        final String buttonLabel = docProvider.isProcessing
+            ? 'Processing Document with AI Pipeline...'
+            : _selectedDetectionMode == 'automatic'
+                ? 'Process & Redact Document (Automatic AI)'
+                : _selectedDetectionMode == 'manual'
+                    ? 'Process & Redact Document (${_manualRegions.length} Manual Zones)'
+                    : 'Process & Redact Document (Automatic + ${_manualRegions.length} Manual)';
+
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: canProcess ? _processDocument : null,
+                icon: docProvider.isProcessing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.shield_outlined, size: 18),
+                label: Text(
+                  buttonLabel,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppTheme.slate200,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            if (docProvider.isProcessing) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_mode_outlined,
+                        size: 16, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _selectedDetectionMode == 'manual'
+                            ? 'Applying ${_manualRegions.length} manual redaction zones → Preserving unselected content intact → Generating secure output...'
+                            : _selectedDetectionMode == 'automatic_manual'
+                                ? 'OCR text extraction → Hybrid AI detection → Merging ${_manualRegions.length} manual zones → Generating redacted document...'
+                                : 'OCR text extraction → Hybrid Regex/NER detection → FAISS policy decision → Redaction generation...',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -907,27 +1844,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.history_outlined,
-                      size: 18, color: AppTheme.primaryColor),
-                  SizedBox(width: 8),
-                  Text(
-                    'Recent Processing Activity',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.slate900,
+              const Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.history_outlined,
+                        size: 18, color: AppTheme.primaryColor),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Recent Processing Activity',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.slate900,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               TextButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AuditLogsScreen()),
-                  );
-                },
+                onPressed: _openAuditLogs,
                 child: const Text('View all →', style: TextStyle(fontSize: 12)),
               ),
             ],
@@ -935,6 +1873,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 12),
           Consumer<DocumentProvider>(
             builder: (_, docProvider, __) {
+              final auth = context.watch<AuthProvider>();
+              if (auth.isGuest) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.slate50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.slate200),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.history_toggle_off_outlined,
+                          size: 36, color: AppTheme.primaryColor),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Document History is Available with an Account',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.slate900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Want to keep your redaction history? Create a free account to save and access your previous redactions.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.slate600,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const RegisterScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.person_add_outlined, size: 14),
+                        label: const Text('Create Free Account',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primaryColor,
+                          side: const BorderSide(color: AppTheme.primaryColor),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
               final logs = docProvider.auditLogs;
               if (docProvider.isLoadingLogs && logs.isEmpty) {
                 return const Center(
@@ -1068,9 +2064,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ── System Health & Compliance Card ───────────────────────────────────────
   Widget _buildSystemHealthCard() {
     final bool apiOnline = _systemHealth != null &&
-        (_systemHealth!['backend'] == 'running' || _systemHealth!['backend'] == 'ok');
+        (_systemHealth!['backend'] == 'running' ||
+            _systemHealth!['backend'] == 'ok' ||
+            _systemHealth!['api_gateway'] == 'online' ||
+            _systemHealth!['status'] == 'healthy' ||
+            _systemHealth!['status'] == 'degraded');
     final bool dbOnline = _systemHealth != null &&
-        (_systemHealth!['database'] == 'connected' || _systemHealth!['database'] == 'ok');
+        (_systemHealth!['database'] == 'connected' ||
+            _systemHealth!['database'] == 'ok');
+    final String dbEngine = (_systemHealth != null &&
+            _systemHealth!['database_engine'] != null &&
+            _systemHealth!['database_engine'].toString().isNotEmpty)
+        ? _systemHealth!['database_engine'].toString()
+        : 'MySQL';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1120,20 +2126,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 8),
           _healthRow(
-            'Database Engine (MySQL)',
+            'Database Engine ($dbEngine)',
             dbOnline ? 'CONNECTED' : (_loadingSystemHealth ? 'CHECKING...' : 'DEGRADED'),
             dbOnline ? AppTheme.accentColor : AppTheme.dangerColor,
           ),
           const SizedBox(height: 8),
           _healthRow(
-            'Regulatory Policy Engine',
-            'ACTIVE (FAISS)',
+            'Policy Corpus',
+            'ACTIVE CORPUS',
             AppTheme.primaryColor,
           ),
           const SizedBox(height: 8),
           _healthRow(
-            'Privacy Compliance',
-            'DPDP & UIDAI Standards',
+            'Corpus Scope',
+            'Legislation, Standards & Mappings',
             const Color(0xFF6D28D9),
           ),
         ],
@@ -1145,7 +2151,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.slate600)),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: AppTheme.slate600),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [

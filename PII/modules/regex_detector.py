@@ -83,8 +83,7 @@ def validate_luhn(card_str):
 PII_DEFINITIONS = {
     'AADHAAR': {
         'patterns': [
-            r'\b[2-9]\d{3}\s\d{4}\s\d{4}\b',           # 1234 5678 9012 (spaced)
-            r'\b[2-9]\d{3}-\d{4}-\d{4}\b',             # 1234-5678-9012 (hyphenated)
+            r'\b[2-9]\d{3}[\s-]+\d{4}[\s-]+\d{4}\b',   # 1234 5678 9012 (flexible spacing or hyphenation)
             r'\b[2-9]\d{11}\b',                         # 123456789012 (continuous)
         ],
         'description': 'Aadhaar Card Number (12 digits)',
@@ -92,15 +91,16 @@ PII_DEFINITIONS = {
     },
     'PAN': {
         'patterns': [
-            r'\b[A-Z]{5}\d{4}[A-Z]\b',                  # ABCDE1234F
+            r'(?i)\b[A-Z]{5}\d{4}[A-Z]\b',              # ABCDE1234F (case-insensitive for OCR)
         ],
         'description': 'PAN Card Number',
         'confidence': 0.98
     },
     'PHONE': {
         'patterns': [
-            r'(?<!\d)(?:\+91[\s-]?)?[6-9]\d{9}(?!\d)',  # +91 9876543210 or 9876543210
-            r'(?<!\d)0[6-9]\d{9}(?!\d)',                # 09876543210
+            r'(?<!\d)(?:\+91[\s-]?)?[6-9]\d{9}(?!\d)',           # +91 9876543210 or 9876543210
+            r'(?<!\d)(?:\+91[\s-]?)?[6-9]\d{4}[\s-]\d{5}(?!\d)', # 98765 43210 (spaced)
+            r'(?<!\d)0[6-9]\d{9}(?!\d)',                         # 09876543210
         ],
         'description': 'Indian Phone Number',
         'confidence': 0.90
@@ -152,8 +152,8 @@ PII_DEFINITIONS = {
     },
     'DOB': {
         'patterns': [
-            r'\b(?:0?[1-9]|[12]\d|3[01])[/-](?:0?[1-9]|1[0-2])[/-](?:19|20)\d{2}\b',       # 15/03/1990
-            r'\b(?:19|20)\d{2}[/-](?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])\b',       # 1990/03/15
+            r'\b(?:0?[1-9]|[12]\d|3[01])[./-](?:0?[1-9]|1[0-2])[./-](?:19|20)\d{2}\b',       # 15/03/1990 or 15.03.1990
+            r'\b(?:19|20)\d{2}[./-](?:0?[1-9]|1[0-2])[./-](?:0?[1-9]|[12]\d|3[01])\b',       # 1990/03/15 or 1990-03-15
             r'\b(?:0?[1-9]|[12]\d|3[01])\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s(?:19|20)\d{2}\b',  # 15 Mar 1990
         ],
         'description': 'Date of Birth',

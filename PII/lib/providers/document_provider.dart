@@ -24,6 +24,8 @@ class DocumentProvider extends ChangeNotifier {
     String? fileName,
     required String docType,
     required String action,
+    String detectionMode = 'automatic',
+    List<Map<String, dynamic>>? manualRegions,
   }) async {
     _isProcessing = true;
     _errorMessage = '';
@@ -36,6 +38,8 @@ class DocumentProvider extends ChangeNotifier {
         fileName: fileName,
         docType: docType,
         action: action,
+        detectionMode: detectionMode,
+        manualRegions: manualRegions,
       );
       _lastResult = DetectionResult.fromJson(response);
       _isProcessing = false;

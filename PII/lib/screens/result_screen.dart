@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/detection_result.dart';
+import '../providers/auth_provider.dart';
 import '../providers/document_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/privlock_badge.dart';
 import '../widgets/privlock_metric_card.dart';
+import 'register_screen.dart';
 
 class ResultScreen extends StatelessWidget {
   const ResultScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    AuthProvider? auth;
+    try {
+      auth = context.watch<AuthProvider>();
+    } catch (_) {
+      auth = null;
+    }
+    final bool isGuest = auth?.isGuest ?? false;
     final result = context.watch<DocumentProvider>().lastResult;
     if (result == null) {
       return Scaffold(
@@ -79,12 +88,96 @@ class ResultScreen extends StatelessWidget {
                 _buildDetectionStatsCard(result),
                 const SizedBox(height: 24),
 
+                // ── Optional Guest Mode Account Promotion CTA ───────────────
+                if (isGuest) ...[
+                  _buildGuestAccountPromotionCard(context),
+                  const SizedBox(height: 24),
+                ],
+
                 // ── Bottom Navigation & Actions ─────────────────────────────
                 _buildBottomActions(context, downloadFilename),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Guest Account Promotion CTA ──────────────────────────────────────────
+  Widget _buildGuestAccountPromotionCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCFCE7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.bookmark_added_outlined,
+                color: Color(0xFF16A34A), size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Want to keep your redaction history?',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF15803D),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Create a free account to save and access your previous redactions, maintain permanent compliance audit logs, and download past records anytime.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF166534),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const RegisterScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.person_add_outlined, size: 14),
+                  label: const Text('Create Free Account'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF15803D),
+                    side: const BorderSide(color: Color(0xFF16A34A)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    textStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -476,6 +569,31 @@ class ResultScreen extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.slate50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.slate200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: AppTheme.slate500),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'PrivLock provides technical privacy/security guidance and automated redaction. It is not legal advice and does not certify regulatory compliance.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: AppTheme.slate600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

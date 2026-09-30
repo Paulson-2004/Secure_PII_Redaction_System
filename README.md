@@ -99,9 +99,60 @@ Flask REST Backend (app.py)
 	     ├──> Regex Detector (Precompiled + Verhoeff & Luhn Checksums)
 	     ├──> NER Detector (SpaCy en_core_web_sm + Administrative Blacklist)
 	     ├──> Hybrid Fusion Engine (Semantic Type Compatibility Matrix)
-	     ├──> Regulatory Policy Retrieval & Decision Engine (15 Regulations + Dense/TF-IDF Cosine Retrieval)
-	     └──> Redaction Engine (Sequence-Aware Visual Masking + Descending Slicing)
+	     ├──> Regulatory Policy Retrieval & Decision Engine (Authoritative Privacy & Security Policy Corpus + FAISS & TF-IDF Retrieval)
+	     └──> Redaction Engine (Dual-Layer Image/Text Masking, Visual Blackout, Gaussian Blur, Manual Overlays)
 ```
+
+## 📜 Authoritative Privacy & Security Policy Corpus
+
+PrivLock embeds an authoritative codified knowledge base of **29 privacy & security policy sources** across clearly defined legal and technical categories:
+
+- **Legislation**:
+  - **India DPDP Act 2023** (Act No. 22 of 2023, MeitY — digital personal data protection obligations, Sections 4, 5, 6, 8, 9)
+  - **UIDAI Aadhaar Act 2016 (Amended 2019)** (Act No. 18 of 2016, Section 29 restrictions on publishing Aadhaar numbers and core biometrics)
+  - **Income Tax Act 1961** (Act No. 43 of 1961, Section 139A PAN quoting & Section 138 taxpayer confidentiality)
+  - **Motor Vehicles Act 1988** (Act No. 59 of 1988, amended 2019, Sections 8-10 & CMVR Rule 16 driving licence credential protection)
+  - **Representation of the People Act 1951** (Act No. 43 of 1951, Section 61 & Registration of Electors Rules 1960 Rule 28 EPIC voter card)
+  - **Passports Act 1967** (Act No. 15 of 1967, Sections 3 & 12, sovereign travel credential protection referencing ICAO Doc 9303)
+  - **GDPR (EU) 2016/679** (Official EUR-Lex, Articles 4(1), 5(1)(c), 6, 9(1), 32, 33, 34 — data minimization, storage limitation, breach notice)
+- **Regulations**:
+  - **Digital Personal Data Protection Rules, 2025** (Final rules notified Nov 2025 by MeitY — Rule 6 security safeguards, Rule 7 erasure, Rule 8 breach notice)
+  - **Information Technology (SPDI) Rules, 2011** (G.S.R. 313(E) subordinate rules under IT Act 2000 Section 43A)
+  - **Registration of Electors Rules, 1960** (Rule 28 — Electoral Photo Identity Card)
+- **Standards**:
+  - **PCI DSS v4.0.1** (Published June 2024 by PCI Security Standards Council — Requirements 3.4 & 3.5 for rendering PAN unreadable and suppressing SAD/CVV)
+  - **ISO/IEC 27001:2022 Control A.8.11** (International standard for information security management — Data Masking control)
+- **Official Guidance**:
+  - **NIST SP 800-122** (Guide to Protecting the Confidentiality of Personally Identifiable Information — official US NIST technical guidance)
+- **Policy Mappings**:
+  - **Medical & Health Record Protection** (Derived from DPDP Act 2023 Sec 8(5), DPDP Rules 2025 Rule 6, and GDPR Art 9; note: DISHA was a 2018 draft bill and was never enacted)
+  - **Bank Statement & Account Redaction** (Derived from RBI KYC Master Direction 2016/2024 and DPDP Act 2023 Sec 8(5))
+  - **Salary Slip & Compensation Confidentiality** (Derived from DPDP Act 2023 and Code on Wages 2019)
+  - **Tax Return & ITR Confidentiality** (Derived from Income Tax Act 1961 Section 138 and DPDP Act 2023)
+  - **Commercial Contract & NDA Confidentiality** (Derived from Indian Contract Act 1872 and commercial trade secret principles)
+  - **General PII Technical Redaction Baseline** (Conservative baseline derived from DPDP Act 2023 Sec 8(5), GDPR Art 5, and ISO 27001 A.8.11)
+  - **Postal Index Demographic Mapping** (Department of Posts PIN system 1972)
+  - **Public Corporate Entity Governance** (Companies Act 2013 Section 399)
+  - **Bank Routing Metadata Mapping** (RBI IFSC directory)
+
+> [!IMPORTANT]
+> **Legal Notice & Compliance Disclaimer**: PrivLock provides technical privacy/security guidance and automated redaction. It is not legal advice and does not certify regulatory compliance. PrivLock does not claim independent GDPR, DPDP, PCI DSS, or ISO compliance certification. Machine detection and OCR may not achieve 100% accuracy; human verification is recommended for high-risk documents.
+
+## ✍️ Manual & User-Selected Redaction Studio
+
+In addition to automated AI detection, PrivLock provides an interactive **Manual Redaction Studio**:
+
+- **3 Processing Modes**:
+  1. `Automatic PII Detection`: Full automated pipeline (OCR + Regex + NER + FAISS Policy Retrieval).
+  2. `Manual Selection`: ONLY user-selected rectangular regions are redacted/masked/blurred. Outside document text and imagery remain untouched.
+  3. `Automatic + Manual`: Combines automated PII detections with custom user-marked zones, applying IoU deduplication to eliminate duplicate passes.
+- **3 Visual Treatments**:
+  - `Redact`: Solid blackout overlay.
+  - `Mask`: Format-preserving asterisks (`****`) or hashed values.
+  - `Blur`: Gaussian smoothing filter over the bounding zone.
+- **Resolution-Independent Coordinates**: Client normalizes coordinates ($0.0 \le x, y, w, h \le 1.0$), ensuring pixel-perfect scaling on the backend regardless of client DPI or image upscaling.
+- **Multi-Page PDF Page Selectivity**: Assign manual regions to specific pages (`Target Page: 1, 2, ...`). In manual mode, unselected pages are preserved intact in the output PDF.
+- **Security Validation**: Strict bounding box clamping to $[0.0, 1.0]$, maximum 50 regions limit, and tenant/guest isolation.
 
 ## 🚀 Cloud Deployment (Free Tier: Vercel + Render)
 
@@ -120,8 +171,8 @@ PrivLock AI is pre-configured for cost-free cloud deployment combining Vercel (F
       - `USE_SQLITE`: `true` (enables zero-maintenance embedded SQLite demo database)
       - `FLASK_ENV`: `production`
       - `SECRET_KEY`: `<generate-a-random-32-byte-hex-string>`
-      - `CORS_ALLOWED_ORIGINS`: `https://<your-app>.vercel.app,http://localhost:*`
-      - `FRONTEND_URL`: `https://<your-app>.vercel.app`
+      - `CORS_ALLOWED_ORIGINS`: `https://*.vercel.app,http://localhost:*`
+      - `FRONTEND_URL`: `https://privlock-ai.vercel.app`
 
 ### 2. Frontend Deployment (Vercel Static Hosting)
 
@@ -226,8 +277,9 @@ http://localhost:5080
   - Pre-compiled regex patterns with mathematical **Verhoeff ($D_5$) checksum** for Aadhaar and **Luhn modulus-10 checksum** for payment cards.
   - Contextual NER via SpaCy with administrative header/label suppression dictionaries.
   - Semantic hybrid fusion with type compatibility matrix and conflict resolution.
-- **Regulatory Policy Retrieval & Decision Engine**: Codified knowledge base of 15 statutory regulations (DPDP Act 2023, Aadhaar Act 2016 §29, IT Act 2000 §43A, PCI-DSS v4.0) with dense vector retrieval (FAISS) and embedded TF-IDF cosine similarity fallback.
-- **Accurate Redaction Engine**: Sequence-aware n-gram bounding box token matching preventing visual over-redaction, paired with descending start-offset text slicing.
+- **Regulatory Policy Retrieval & Decision Engine**: Codified knowledge base of 29 privacy & security policy sources (DPDP Act 2023 & Rules 2025, Aadhaar Act 2016, PCI-DSS v4.0.1, GDPR, ISO/IEC 27001:2022, NIST SP 800-122, and derived use-case mappings) with dense vector retrieval (FAISS) and embedded TF-IDF cosine similarity fallback.
+- **Accurate Redaction Engine**: Sequence-aware n-gram bounding box token matching preventing visual over-redaction, paired with descending start-offset text slicing, solid blackout, format-preserving masking, and Gaussian blur.
+- **Interactive Manual Selection Studio**: User-guided canvas marking custom zones across single- and multi-page documents with normalized coordinate scaling.
 - **Audit Logging**: Structured document processing history and system security events viewable in the Flutter UI.
 
 ## Tech Stack
@@ -235,14 +287,14 @@ http://localhost:5080
 - **Frontend**: Flutter (v3.x), Dart, Provider, Material 3, Cross-Browser Flutter Web (Microsoft Edge, Google Chrome, Mozilla Firefox, Apple Safari) and Android support
 - **Backend**: Python 3.11+ (verified development/test environment: Python 3.14.7), Flask, Flask-CORS, bcrypt
 - **AI & NLP Pipeline**: Tesseract OCR, OpenCV, PyMuPDF, SpaCy (`en_core_web_sm`), sentence-transformers (`all-MiniLM-L6-v2`), FAISS, TF-IDF Cosine Retrieval (embedded fallback)
-- **Data Layer**: MySQL 8.x (primary pooled) / SQLite 3 (`privlock.db`, automated fallback)
+- **Data Layer**: MySQL 8.x (primary local pooled) / PostgreSQL (production via DATABASE_URL) / SQLite 3 (`privlock.db`, automated local fallback)
 
 ## Verified Quality & Benchmarks
 
-- **Backend Automated Tests**: 34/34 tests passing across unit, security, and integration suites (`python -m unittest discover tests`, verified on Python 3.14.7).
-- **End-to-End Pipeline**: 2/2 pipeline tests passing (`python -m unittest tests.test_end_to_end_pipeline`).
-- **Flutter Code Quality**: `flutter analyze lib` reports 0 issues; all widget tests passing (`flutter test`).
-- **Web Build**: Successfully compiles to production web bundle (`flutter build web --release`).
+- **Backend Automated Tests**: 80/80 tests passing across unit, security, multi-page PDF, RAG, and integration suites (`python -m unittest discover tests`, verified on Python 3.14.7).
+- **End-to-End Pipeline**: 3/3 multi-page and end-to-end pipeline tests passing.
+- **Flutter Code Quality**: `flutter analyze lib test` reports 0 issues; all 29 widget and unit tests passing (`flutter test`).
+- **Web Build**: Successfully compiles to production release web bundle (`flutter build web --release`).
 - **OCR Latency Reduction**: 49.0% reduction in local controlled benchmark (1089.1 ms dual-pass vs 555.8 ms single-pass, 5-run average).
 
 ## 📸 Screenshots

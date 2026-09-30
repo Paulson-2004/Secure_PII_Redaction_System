@@ -25,7 +25,7 @@ class UserAvatarButton extends StatelessWidget {
           onTap: () => _showProfilePanel(context),
           borderRadius: BorderRadius.circular(24),
           child: Tooltip(
-            message: 'Profile',
+            message: auth.isGuest ? 'Guest User (Click to sign in)' : 'Profile',
             child: Container(
               width: 40,
               height: 40,
@@ -49,15 +49,21 @@ class UserAvatarButton extends StatelessWidget {
                 ],
               ),
               child: Center(
-                child: Text(
-                  (auth.username.isNotEmpty ? auth.username[0] : 'U')
-                      .toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                child: auth.isGuest
+                    ? const Icon(
+                        Icons.person_outline,
+                        size: 20,
+                        color: Colors.white,
+                      )
+                    : Text(
+                        (auth.username.isNotEmpty ? auth.username[0] : 'U')
+                            .toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
           ),

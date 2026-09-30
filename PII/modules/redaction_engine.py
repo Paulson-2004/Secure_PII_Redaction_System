@@ -36,6 +36,9 @@ def _get_replacement_text(value, detection):
     if decision == 'FULL_REDACT':
         return '█' * val_len
 
+    if decision == 'BLUR':
+        return '[BLURRED]' if val_len >= 8 else '░' * val_len
+
     if decision == 'PARTIAL_MASK':
         pii_type = detection.get('type', '')
 
@@ -51,7 +54,7 @@ def _get_replacement_text(value, detection):
                 user, domain = parts[0], parts[1]
                 masked_user = user[0] + '***' if len(user) > 1 else '***'
                 return f"{masked_user}@{domain}"
-            return '█' * val_len
+            return '*' * val_len
 
         elif pii_type == 'PERSON_NAME':
             words = value.split()
@@ -70,18 +73,23 @@ def _get_replacement_text(value, detection):
             digits = re.sub(r'\D', '', value)
             if len(digits) == 12:
                 return f"XXXX-XXXX-{digits[-4:]}"
-            return '█' * val_len
+            return '*' * val_len
 
         elif pii_type in ('CREDIT_CARD', 'BANK_ACCOUNT'):
             digits = re.sub(r'\D', '', value)
             if len(digits) >= 4:
                 return '*' * (len(digits) - 4) + digits[-4:]
-            return '█' * val_len
+            return '*' * val_len
+
+        elif pii_type == 'PAN':
+            if len(value) == 10:
+                return f"XXXXX{value[5:9]}X"
+            return '*' * val_len
 
         else:
             if val_len > 4:
                 return '*' * (val_len - 4) + value[-4:]
-            return '█' * val_len
+            return '*' * val_len
 
     return '█' * val_len
 
@@ -185,17 +193,106 @@ def _find_word_boxes_for_pii(pii_value, ocr_words):
                     'h': w['h']
                 })
 
+    # Strategy 3: Multi-word sequence whose combined text matches clean_full_pii
+    if not matching_boxes:
+        clean_full_pii = _clean_token(pii_value)
+        for i in range(n_words):
+            accumulated = ""
+            seq_words = []
+            for j in range(i, min(n_words, i + 8)):
+                cw = _clean_token(ocr_words[j]['text'])
+                if not cw:
+                    continue
+                accumulated += cw
+                seq_words.append(ocr_words[j])
+                if accumulated == clean_full_pii:
+                    min_x = min(w['x'] for w in seq_words)
+                    min_y = min(w['y'] for w in seq_words)
+                    max_x = max(w['x'] + w['w'] for w in seq_words)
+                    max_y = max(w['y'] + w['h'] for w in seq_words)
+                    matching_boxes.append({
+                        'x': min_x,
+                        'y': min_y,
+                        'w': max_x - min_x,
+                        'h': max_y - min_y
+                    })
+                    break
+                elif len(accumulated) > len(clean_full_pii):
+                    break
+
     return matching_boxes
 
 
-def redact_image(image, detections, ocr_words):
+def apply_visual_treatment(image, x, y, w, h, decision, replacement_text="****"):
     """
-    Apply visual redaction to document image based on OCR bounding boxes.
+    Apply visual treatment (FULL_REDACT, BLUR, PARTIAL_MASK) directly to image bounding box.
+    Modifies image in-place.
+    """
+    if image is None:
+        return
+    img_h, img_w = image.shape[:2]
+    # Clamp coordinates to image boundaries
+    x = max(0, min(img_w - 1, int(x)))
+    y = max(0, min(img_h - 1, int(y)))
+    w = max(1, min(img_w - x, int(w)))
+    h = max(1, min(img_h - y, int(h)))
+
+    if decision == 'FULL_REDACT':
+        # Filled solid black box
+        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 0), -1)
+
+    elif decision == 'BLUR':
+        # Irreversible Gaussian Blur over target region
+        roi = image[y:y + h, x:x + w]
+        if roi.size > 0:
+            down_w = max(1, w // 6)
+            down_h = max(1, h // 6)
+            small = cv2.resize(roi, (down_w, down_h), interpolation=cv2.INTER_LINEAR)
+            upscaled = cv2.resize(small, (w, h), interpolation=cv2.INTER_LINEAR)
+            k_w = max(15, (w // 3) * 2 + 1)
+            k_h = max(15, (h // 3) * 2 + 1)
+            blurred = cv2.GaussianBlur(upscaled, (k_w, k_h), sigmaX=10, sigmaY=10)
+            image[y:y + h, x:x + w] = blurred
+
+    elif decision == 'PARTIAL_MASK':
+        # Format-preserving visual mask:
+        # 1. Clear original sensitive pixels completely with clean neutral background
+        cv2.rectangle(image, (x, y), (x + w, y + h), (245, 245, 245), -1)
+        cv2.rectangle(image, (x, y), (x + w, y + h), (190, 190, 190), 1)
+
+        # 2. Format-preserving mask text
+        mask_str = replacement_text.replace('█', '*').replace('░', '*')
+        if not mask_str or not mask_str.strip():
+            mask_str = '****'
+
+        # 3. Fit and draw text inside bounding box
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = min(0.85, max(0.32, (h - 4) / 28.0))
+        thickness = 1 if font_scale < 0.6 else 2
+
+        (tw, th), _ = cv2.getTextSize(mask_str, font, font_scale, thickness)
+        if tw > w - 4 and len(mask_str) > 4:
+            mask_str = '****'
+            (tw, th), _ = cv2.getTextSize(mask_str, font, font_scale, thickness)
+
+        while tw > max(4, w - 4) and font_scale > 0.22:
+            font_scale -= 0.04
+            (tw, th), _ = cv2.getTextSize(mask_str, font, font_scale, thickness)
+
+        tx = max(x + 2, x + (w - tw) // 2)
+        ty = max(y + th + 2, y + (h + th) // 2)
+        cv2.putText(image, mask_str, (tx, ty), font, font_scale, (30, 30, 30), thickness, cv2.LINE_AA)
+
+
+def redact_image(image, detections, ocr_words, manual_regions=None):
+    """
+    Apply visual redaction to document image based on OCR bounding boxes and/or manual regions.
 
     Args:
         image: OpenCV BGR image (np.ndarray)
         detections: List of detections with decisions
         ocr_words: List of OCR words with bounding boxes
+        manual_regions: Optional list of user-selected regions (normalized or pixel dicts)
 
     Returns:
         Redacted OpenCV BGR image (np.ndarray)
@@ -206,38 +303,88 @@ def redact_image(image, detections, ocr_words):
     redacted_img = image.copy()
     img_h, img_w = redacted_img.shape[:2]
 
-    for det in detections:
-        decision = det.get('decision', 'FULL_REDACT')
-        if decision == 'KEEP':
-            continue
+    processed_boxes = []
 
-        boxes = _find_word_boxes_for_pii(det.get('value', ''), ocr_words)
-        if not boxes:
-            continue
+    def _boxes_overlap(b1, b2, iou_thresh=0.7):
+        x1 = max(b1[0], b2[0])
+        y1 = max(b1[1], b2[1])
+        x2 = min(b1[0] + b1[2], b2[0] + b2[2])
+        y2 = min(b1[1] + b1[3], b2[1] + b2[3])
+        inter = max(0, x2 - x1) * max(0, y2 - y1)
+        if inter <= 0:
+            return False
+        area1 = b1[2] * b1[3]
+        area2 = b2[2] * b2[3]
+        union = area1 + area2 - inter
+        return (inter / union) >= iou_thresh if union > 0 else False
 
-        for box in boxes:
-            padding = 4
-            x = max(0, box['x'] - padding)
-            y = max(0, box['y'] - padding)
-            w = min(img_w - x, box['w'] + 2 * padding)
-            h = min(img_h - y, box['h'] + 2 * padding)
-
-            if w <= 0 or h <= 0:
+    # 1. Automatic OCR Detections
+    if detections and ocr_words:
+        for det in detections:
+            decision = det.get('decision', 'FULL_REDACT')
+            if decision == 'KEEP':
                 continue
 
-            if decision == 'FULL_REDACT':
-                # Filled black box
-                cv2.rectangle(redacted_img, (x, y), (x + w, y + h), (0, 0, 0), -1)
+            boxes = _find_word_boxes_for_pii(det.get('value', ''), ocr_words)
+            if not boxes:
+                continue
 
-            elif decision == 'PARTIAL_MASK':
-                # Safe mosaic pixelation (robust for any ROI size)
-                roi = redacted_img[y:y + h, x:x + w]
-                if roi.size > 0:
-                    small_w = max(1, w // 8)
-                    small_h = max(1, h // 8)
-                    small = cv2.resize(roi, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
-                    pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
-                    redacted_img[y:y + h, x:x + w] = pixelated
+            replacement_text = _get_replacement_text(det.get('value', ''), det)
+
+            for box in boxes:
+                padding = 4
+                x = max(0, box['x'] - padding)
+                y = max(0, box['y'] - padding)
+                w = min(img_w - x, box['w'] + 2 * padding)
+                h = min(img_h - y, box['h'] + 2 * padding)
+
+                if w <= 0 or h <= 0:
+                    continue
+
+                apply_visual_treatment(redacted_img, x, y, w, h, decision, replacement_text)
+                processed_boxes.append((x, y, w, h))
+
+    # 2. Manual User-Selected Regions
+    if manual_regions:
+        for mreg in manual_regions:
+            action = str(mreg.get('action', 'redact')).upper()
+            if action in ('FULL_REDACT', 'REDACT'):
+                decision = 'FULL_REDACT'
+            elif action in ('BLUR',):
+                decision = 'BLUR'
+            elif action in ('PARTIAL_MASK', 'MASK'):
+                decision = 'PARTIAL_MASK'
+            else:
+                decision = 'FULL_REDACT'
+
+            norm_x = float(mreg.get('x', 0.0))
+            norm_y = float(mreg.get('y', 0.0))
+            norm_w = float(mreg.get('width', mreg.get('w', 0.0)))
+            norm_h = float(mreg.get('height', mreg.get('h', 0.0)))
+
+            # If normalized coordinates (0.0 .. 1.0), scale to actual image pixels
+            if norm_w <= 1.0 and norm_h <= 1.0 and norm_x <= 1.0 and norm_y <= 1.0:
+                px_x = int(round(norm_x * img_w))
+                px_y = int(round(norm_y * img_h))
+                px_w = int(round(norm_w * img_w))
+                px_h = int(round(norm_h * img_h))
+            else:
+                px_x = int(round(norm_x))
+                px_y = int(round(norm_y))
+                px_w = int(round(norm_w))
+                px_h = int(round(norm_h))
+
+            px_x = max(0, min(img_w - 1, px_x))
+            px_y = max(0, min(img_h - 1, px_y))
+            px_w = max(1, min(img_w - px_x, px_w))
+            px_h = max(1, min(img_h - px_y, px_h))
+
+            box_tuple = (px_x, px_y, px_w, px_h)
+            if any(_boxes_overlap(box_tuple, pb, iou_thresh=0.7) for pb in processed_boxes):
+                continue
+
+            apply_visual_treatment(redacted_img, px_x, px_y, px_w, px_h, decision, "********")
+            processed_boxes.append(box_tuple)
 
     return redacted_img
 
@@ -295,7 +442,7 @@ def save_redacted_text(redacted_text, output_path):
     return output_path
 
 
-def process_redaction(original_text, original_image, ocr_words, detections, output_image_path):
+def process_redaction(original_text, original_image, ocr_words, detections, output_image_path, manual_regions=None):
     """
     Main redaction entrypoint: process text and visual image redactions.
 
@@ -310,22 +457,36 @@ def process_redaction(original_text, original_image, ocr_words, detections, outp
 
     redacted_path = None
     if original_image is not None and output_image_path:
-        redacted_image = redact_image(original_image, detections, ocr_words)
+        redacted_image = redact_image(original_image, detections, ocr_words, manual_regions=manual_regions)
         redacted_path = save_redacted_image(redacted_image, output_image_path)
     elif output_image_path:
         redacted_path = save_redacted_text(redacted_text, output_image_path)
 
     full_redacted = sum(1 for d in detections if d.get('decision') == 'FULL_REDACT')
     partial_masked = sum(1 for d in detections if d.get('decision') == 'PARTIAL_MASK')
+    blurred = sum(1 for d in detections if d.get('decision') == 'BLUR')
     kept = sum(1 for d in detections if d.get('decision') == 'KEEP')
+
+    if manual_regions:
+        for m in manual_regions:
+            m_act = str(m.get('action', 'redact')).upper()
+            if m_act in ('BLUR',):
+                blurred += 1
+            elif m_act in ('PARTIAL_MASK', 'MASK'):
+                partial_masked += 1
+            else:
+                full_redacted += 1
+
+    total_elements = len(detections) + (len(manual_regions) if manual_regions else 0)
 
     return {
         'redacted_text': redacted_text,
         'redacted_image_path': redacted_path,
         'summary': {
-            'total_pii': len(detections),
+            'total_pii': total_elements,
             'full_redacted': full_redacted,
             'partial_masked': partial_masked,
+            'blurred': blurred,
             'kept': kept
         }
     }

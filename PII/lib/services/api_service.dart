@@ -142,6 +142,8 @@ class ApiService {
     String? fileName,
     required String docType,
     required String action,
+    String detectionMode = 'automatic',
+    List<Map<String, dynamic>>? manualRegions,
   }) async {
     final normalizedAction = action == 'annotate' ? 'blur' : action;
     final request = http.MultipartRequest(
@@ -156,6 +158,10 @@ class ApiService {
     }
     request.fields['doc_type'] = docType;
     request.fields['action'] = normalizedAction;
+    request.fields['detection_mode'] = detectionMode;
+    if (manualRegions != null && manualRegions.isNotEmpty) {
+      request.fields['manual_regions'] = jsonEncode(manualRegions);
+    }
 
     if (kIsWeb) {
       if (fileBytes == null || fileName == null || fileName.trim().isEmpty) {

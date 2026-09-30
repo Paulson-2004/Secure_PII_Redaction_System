@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   bool _isLoggedIn = false;
+  bool _isGuest = false;
   String _username = '';
   String _email = '';
   bool _isLoading = false;
@@ -11,6 +12,8 @@ class AuthProvider extends ChangeNotifier {
   bool _initialized = false;
 
   bool get isLoggedIn => _isLoggedIn;
+  bool get isGuest => _isGuest;
+  bool get isAuthenticated => _isLoggedIn && !_isGuest;
   String get username => _username;
   String get email => _email;
   bool get isLoading => _isLoading;
@@ -19,6 +22,17 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider() {
     _loadSession();
+  }
+
+  void continueAsGuest() {
+    _isLoggedIn = false;
+    _isGuest = true;
+    _username = 'Guest';
+    _email = '';
+    _errorMessage = '';
+    ApiService.clearSessionCookie();
+    ApiService.clearAuthToken();
+    notifyListeners();
   }
 
   Future<void> initialize() async {
@@ -57,6 +71,7 @@ class AuthProvider extends ChangeNotifier {
 
       if (result['success'] == true) {
         _isLoggedIn = true;
+        _isGuest = false;
         _username = username;
         _email = (result['data'] is Map<String, dynamic>)
             ? (result['data']['email']?.toString() ?? '')
@@ -156,6 +171,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> clearLocalSession() async {
     _isLoggedIn = false;
+    _isGuest = false;
     _username = '';
     _email = '';
     final prefs = await SharedPreferences.getInstance();

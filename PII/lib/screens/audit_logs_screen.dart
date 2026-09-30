@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/document_provider.dart';
 import '../models/audit_log.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/privlock_badge.dart';
 import '../widgets/privlock_metric_card.dart';
+import 'login_screen.dart';
 
 class AuditLogsScreen extends StatefulWidget {
   const AuditLogsScreen({super.key});
@@ -24,7 +26,10 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<DocumentProvider>().loadAuditLogs();
+      final auth = context.read<AuthProvider>();
+      if (auth.isAuthenticated) {
+        context.read<DocumentProvider>().loadAuditLogs();
+      }
     });
   }
 
@@ -50,6 +55,94 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (auth.isGuest) {
+      return Scaffold(
+        backgroundColor: AppTheme.surfaceColor,
+        appBar: AppBar(
+          title: const Text('Compliance Audit Trail'),
+        ),
+        body: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 550),
+            padding: const EdgeInsets.all(28),
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.slate200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryLight,
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: const Icon(
+                    Icons.history_toggle_off_outlined,
+                    size: 28,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Audit Trail is Available for Registered Accounts',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.slate900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'PrivLock does not store guest documents or logs in the database to protect your privacy. To maintain compliance audit logs and access your redaction history, please create an account or sign in.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.slate600,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Go Back'),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const LoginScreen()),
+                        );
+                      },
+                      child: const Text('Sign In / Register'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
