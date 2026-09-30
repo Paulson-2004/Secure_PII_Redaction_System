@@ -81,30 +81,72 @@ class PipelineStepper extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.account_tree_outlined,
-                  size: 16, color: AppTheme.primaryColor),
-              SizedBox(width: 8),
-              Text(
-                'AI Redaction Pipeline Architecture',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.slate800,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              Spacer(),
-              Text(
-                'End-to-End Privacy Workflow',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.slate400,
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 480;
+              if (isCompact) {
+                return const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.account_tree_outlined,
+                            size: 16, color: AppTheme.primaryColor),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'AI Redaction Pipeline Architecture',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.slate800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Padding(
+                      padding: EdgeInsets.only(left: 24),
+                      child: Text(
+                        'End-to-End Privacy Workflow',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.slate400,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return const Row(
+                children: [
+                  Icon(Icons.account_tree_outlined,
+                      size: 16, color: AppTheme.primaryColor),
+                  SizedBox(width: 8),
+                  Text(
+                    'AI Redaction Pipeline Architecture',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.slate800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  Spacer(),
+                  Text(
+                    'End-to-End Privacy Workflow',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.slate400,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           LayoutBuilder(

@@ -80,6 +80,7 @@ class ResultScreen extends StatelessWidget {
                   const SizedBox(height: 22),
                 ],
 
+
                 // ── Detected PII Details Table (From Report Fig 9.4) ─────────
                 _buildPiiDetailsTable(result),
                 const SizedBox(height: 22),
@@ -426,6 +427,7 @@ class ResultScreen extends StatelessWidget {
       ),
     );
   }
+
 
   // ── Detected PII Details Table (Report Fig 9.4) ───────────────────────────
   Widget _buildPiiDetailsTable(DetectionResult result) {

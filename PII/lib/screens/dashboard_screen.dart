@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
@@ -21,6 +22,12 @@ import 'audit_logs_screen.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'result_screen.dart';
+
+enum HealthCheckStatus {
+  checking,
+  connected,
+  disconnected,
+}
 
 class DashboardScreen extends StatefulWidget {
   final String? initialAction;
@@ -53,6 +60,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? _systemHealth;
   String? _systemHealthError;
   bool _loadingSystemHealth = true;
+  HealthCheckStatus _healthStatus = HealthCheckStatus.checking;
+  int _healthCheckGeneration = 0;
+  Timer? _healthRetryTimer;
 
   @override
   void initState() {
@@ -114,8 +124,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Timer? _healthRetryTimer;
+
   @override
   void dispose() {
+    _healthRetryTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -131,17 +144,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _loadSystemHealth() async {
+  Future<void> _loadSystemHealth({int retryCount = 0}) async {
+    _healthRetryTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _loadingSystemHealth = true;
+    });
+  Future<void> _loadSystemHealth({int retryCount = 0, int? generation}) async {
+    if (generation == null) {
+      _healthRetryTimer?.cancel();
+      _healthCheckGeneration++;
+      generation = _healthCheckGeneration;
+      if (!mounted) return;
+      setState(() {
+        if (_systemHealth == null) {
+          _healthStatus = HealthCheckStatus.checking;
+        }
+      });
+    }
+
     try {
       final health = await ApiService.getSystemHealth();
       if (!mounted) return;
-      setState(() {
-        _systemHealth = health['data'] is Map<String, dynamic>
-            ? health['data'] as Map<String, dynamic>
-            : null;
-        _systemHealthError = null;
-        _loadingSystemHealth = false;
-      });
+      if (!mounted || generation != _healthCheckGeneration) return;
+      final data = health['data'] is Map<String, dynamic>
+          ? health['data'] as Map<String, dynamic>
+          : null;
+      if (data != null && data['backend'] == 'running') {
+      if (data != null && (data['backend'] == 'running' || data['backend'] == 'ok')) {
+        setState(() {
+          _systemHealth = data;
+          _systemHealthError = null;
+          _loadingSystemHealth = false;
+          _healthStatus = HealthCheckStatus.connected;
+        });
+        return;
+      }
+      throw Exception(health['message'] ?? 'Backend response invalid');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -149,6 +188,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _systemHealthError = e.toString();
         _loadingSystemHealth = false;
       });
+      if (!mounted || generation != _healthCheckGeneration) return;
+
+      // Auto-retry up to 3 times with 5s backoff if initial health check fails (e.g. cloud cold start)
+      if (retryCount < 3 && mounted) {
+      // Auto-retry up to 3 times with 5s backoff if health check fails (e.g. cloud cold start)
+      if (retryCount < 3) {
+        setState(() {
+          if (_systemHealth == null) {
+            _healthStatus = HealthCheckStatus.checking;
+          }
+        });
+        final int nextRetry = retryCount + 1;
+        final int targetGen = generation;
+        _healthRetryTimer = Timer(const Duration(seconds: 5), () {
+          if (mounted && _systemHealth == null) {
+            _loadSystemHealth(retryCount: retryCount + 1);
+          if (mounted && targetGen == _healthCheckGeneration && _healthStatus != HealthCheckStatus.connected) {
+            _loadSystemHealth(retryCount: nextRetry, generation: targetGen);
+          }
+        });
+      } else {
+        // Genuine failure after all retries exhausted:
+        setState(() {
+          _systemHealth = null;
+          _healthStatus = HealthCheckStatus.disconnected;
+        });
+      }
     }
   }
 
@@ -540,9 +606,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (success && mounted) {
+      if (_systemHealth == null) {
+        _loadSystemHealth();
+      }
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const ResultScreen()),
-      );
+      ).then((_) {
+        if (mounted && _systemHealth == null) {
+          _loadSystemHealth();
+        }
+      });
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2064,19 +2137,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ── System Health & Compliance Card ───────────────────────────────────────
   Widget _buildSystemHealthCard() {
     final bool apiOnline = _systemHealth != null &&
+    final bool isChecking = _healthStatus == HealthCheckStatus.checking;
+    final bool isConnected = _healthStatus == HealthCheckStatus.connected;
+    final bool apiOnline = isConnected &&
+        _systemHealth != null &&
         (_systemHealth!['backend'] == 'running' ||
             _systemHealth!['backend'] == 'ok' ||
             _systemHealth!['api_gateway'] == 'online' ||
             _systemHealth!['status'] == 'healthy' ||
             _systemHealth!['status'] == 'degraded');
     final bool dbOnline = _systemHealth != null &&
+    final bool dbOnline = isConnected &&
+        _systemHealth != null &&
         (_systemHealth!['database'] == 'connected' ||
             _systemHealth!['database'] == 'ok');
-    final String dbEngine = (_systemHealth != null &&
-            _systemHealth!['database_engine'] != null &&
-            _systemHealth!['database_engine'].toString().isNotEmpty)
-        ? _systemHealth!['database_engine'].toString()
-        : 'MySQL';
+    final String? rawEngine = _systemHealth?['database_engine']?.toString();
+    final String dbEngineLabel = (rawEngine != null && rawEngine.isNotEmpty)
+        ? 'Database Engine ($rawEngine)'
+        : 'Database Engine';
+
+    final String apiStatusText = isChecking
+        ? 'Checking...'
+        : (apiOnline ? 'Connected' : 'Disconnected');
+    final Color apiStatusColor = isChecking
+        ? AppTheme.slate500
+        : (apiOnline ? AppTheme.accentColor : AppTheme.dangerColor);
+
+    final String dbStatusText = isChecking
+        ? 'Checking...'
+        : (dbOnline ? 'Connected' : 'Disconnected');
+    final Color dbStatusColor = isChecking
+        ? AppTheme.slate500
+        : (dbOnline ? AppTheme.accentColor : AppTheme.dangerColor);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -2106,16 +2198,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-              if (_loadingSystemHealth)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 1.5),
-                )
-              else if (_systemHealthError != null)
-                const Text('Offline', style: TextStyle(fontSize: 11, color: AppTheme.dangerColor))
-              else
-                const Text('Synced', style: TextStyle(fontSize: 11, color: AppTheme.accentColor)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 16, color: AppTheme.slate500),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                    splashRadius: 14,
+                    tooltip: 'Refresh system health',
+                    onPressed: _loadingSystemHealth ? null : () => _loadSystemHealth(),
+                    onPressed: isChecking ? null : () => _loadSystemHealth(),
+                  ),
+                  const SizedBox(width: 4),
+                  if (_loadingSystemHealth)
+                  if (isChecking) ...[
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    )
+                  else if (_systemHealthError != null || !apiOnline)
+                    const Text('Offline', style: TextStyle(fontSize: 11, color: AppTheme.dangerColor))
+                    ),
+                    const SizedBox(width: 6),
+                    const Text('Checking...', style: TextStyle(fontSize: 11, color: AppTheme.slate500)),
+                  ] else if (!apiOnline)
+                    const Text('Disconnected', style: TextStyle(fontSize: 11, color: AppTheme.dangerColor))
+                  else if (!dbOnline)
+                    const Text('Degraded', style: TextStyle(fontSize: 11, color: Color(0xFFF59E0B)))
+                  else
+                    const Text('Synced', style: TextStyle(fontSize: 11, color: AppTheme.accentColor)),
+                    const Text('Connected', style: TextStyle(fontSize: 11, color: AppTheme.accentColor)),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -2123,12 +2241,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'API Gateway (Flask)',
             apiOnline ? 'ONLINE' : (_loadingSystemHealth ? 'CHECKING...' : 'DISCONNECTED'),
             apiOnline ? AppTheme.accentColor : AppTheme.dangerColor,
+            apiStatusText,
+            apiStatusColor,
           ),
           const SizedBox(height: 8),
           _healthRow(
-            'Database Engine ($dbEngine)',
-            dbOnline ? 'CONNECTED' : (_loadingSystemHealth ? 'CHECKING...' : 'DEGRADED'),
+            dbEngineLabel,
+            dbOnline ? 'CONNECTED' : (_loadingSystemHealth ? 'CHECKING...' : 'DISCONNECTED'),
             dbOnline ? AppTheme.accentColor : AppTheme.dangerColor,
+            dbStatusText,
+            dbStatusColor,
           ),
           const SizedBox(height: 8),
           _healthRow(

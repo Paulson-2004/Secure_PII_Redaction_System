@@ -144,9 +144,13 @@ def _find_word_boxes_for_pii(pii_value, ocr_words):
     """
     Sequence-aware bounding box locator for PII values in OCR word tokens.
     Prevents over-redaction by requiring exact token or n-gram matches.
+    Finds all occurrences of the PII entity across the document page.
     """
     if not pii_value or not ocr_words:
         return []
+
+    # Sort words spatially into reading order (bucketed y, x)
+    sorted_words = sorted(ocr_words, key=lambda w: (round(w.get('y', 0) / 20.0), w.get('x', 0)))
 
     target_tokens = [_clean_token(t) for t in pii_value.split() if _clean_token(t)]
     if not target_tokens:
@@ -157,68 +161,77 @@ def _find_word_boxes_for_pii(pii_value, ocr_words):
 
     matching_boxes = []
     n_tokens = len(target_tokens)
-    n_words = len(ocr_words)
+    n_words = len(sorted_words)
 
-    # Strategy 1: Match multi-word consecutive sequences
+    def _already_covered(cand_box):
+        cx, cy, cw, ch = cand_box['x'], cand_box['y'], cand_box['w'], cand_box['h']
+        for mb in matching_boxes:
+            mx, my, mw, mh = mb['x'], mb['y'], mb['w'], mb['h']
+            if not (cx + cw < mx or cx > mx + mw or cy + ch < my or cy > my + mh):
+                return True
+        return False
+
+    # Strategy 1: Match multi-word consecutive sequences (all occurrences across page)
     for i in range(n_words - n_tokens + 1):
-        window_words = ocr_words[i:i + n_tokens]
+        window_words = sorted_words[i:i + n_tokens]
         window_tokens = [_clean_token(w['text']) for w in window_words]
 
         if window_tokens == target_tokens:
-            # Union of bounding boxes across the sequence
             min_x = min(w['x'] for w in window_words)
             min_y = min(w['y'] for w in window_words)
             max_x = max(w['x'] + w['w'] for w in window_words)
             max_y = max(w['y'] + w['h'] for w in window_words)
-            matching_boxes.append({
+            box = {
                 'x': min_x,
                 'y': min_y,
                 'w': max_x - min_x,
                 'h': max_y - min_y
-            })
+            }
+            if not _already_covered(box):
+                matching_boxes.append(box)
 
     # Strategy 2: Single-token containment (e.g. email or continuous Aadhaar)
-    if not matching_boxes:
-        clean_full_pii = _clean_token(pii_value)
-        for w in ocr_words:
-            w_clean = _clean_token(w['text'])
-            if not w_clean:
-                continue
-            # Either exact token match or full PII contained in single OCR word
-            if w_clean == clean_full_pii or (len(w_clean) >= 6 and w_clean in clean_full_pii):
-                matching_boxes.append({
-                    'x': w['x'],
-                    'y': w['y'],
-                    'w': w['w'],
-                    'h': w['h']
-                })
+    clean_full_pii = _clean_token(pii_value)
+    for w in sorted_words:
+        w_clean = _clean_token(w['text'])
+        if not w_clean:
+            continue
+        if w_clean == clean_full_pii or (len(w_clean) >= 6 and w_clean in clean_full_pii):
+            box = {
+                'x': w['x'],
+                'y': w['y'],
+                'w': w['w'],
+                'h': w['h']
+            }
+            if not _already_covered(box):
+                matching_boxes.append(box)
 
     # Strategy 3: Multi-word sequence whose combined text matches clean_full_pii
-    if not matching_boxes:
-        clean_full_pii = _clean_token(pii_value)
-        for i in range(n_words):
-            accumulated = ""
-            seq_words = []
-            for j in range(i, min(n_words, i + 8)):
-                cw = _clean_token(ocr_words[j]['text'])
-                if not cw:
-                    continue
-                accumulated += cw
-                seq_words.append(ocr_words[j])
-                if accumulated == clean_full_pii:
-                    min_x = min(w['x'] for w in seq_words)
-                    min_y = min(w['y'] for w in seq_words)
-                    max_x = max(w['x'] + w['w'] for w in seq_words)
-                    max_y = max(w['y'] + w['h'] for w in seq_words)
-                    matching_boxes.append({
-                        'x': min_x,
-                        'y': min_y,
-                        'w': max_x - min_x,
-                        'h': max_y - min_y
-                    })
-                    break
-                elif len(accumulated) > len(clean_full_pii):
-                    break
+    for i in range(n_words):
+        accumulated = ""
+        seq_words = []
+        for j in range(i, min(n_words, i + 8)):
+            cw = _clean_token(sorted_words[j]['text'])
+            if not cw:
+                continue
+            accumulated += cw
+            seq_words.append(sorted_words[j])
+            if accumulated == clean_full_pii:
+                min_x = min(w['x'] for w in seq_words)
+                min_y = min(w['y'] for w in seq_words)
+                max_x = max(w['x'] + w['w'] for w in seq_words)
+                max_y = max(w['y'] + w['h'] for w in seq_words)
+                box = {
+                    'x': min_x,
+                    'y': min_y,
+                    'w': max_x - min_x,
+                    'h': max_y - min_y
+                }
+                if not _already_covered(box):
+                    matching_boxes.append(box)
+                break
+            elif len(accumulated) > len(clean_full_pii):
+                break
 
     return matching_boxes
 

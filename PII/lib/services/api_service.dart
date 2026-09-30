@@ -24,8 +24,15 @@ class ApiService {
           : override;
     }
 
+    // In release mode on any platform (Web, Android, iOS, Desktop),
+    // default to the production Render backend.
+    if (kReleaseMode) {
+      return productionApiUrl;
+    }
+
+    // In debug/local development mode:
     if (kIsWeb) {
-      return kReleaseMode ? productionApiUrl : localApiUrl;
+      return localApiUrl;
     }
 
     if (Platform.isAndroid) {
@@ -230,10 +237,12 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getSystemHealth() async {
-    final response = await http.get(
-      _buildUri('/api/health'),
-      headers: _defaultHeaders,
-    );
+    final response = await http
+        .get(
+          _buildUri('/api/health'),
+          headers: _defaultHeaders,
+        )
+        .timeout(const Duration(seconds: 15));
     return _handleResponse(response);
   }
 

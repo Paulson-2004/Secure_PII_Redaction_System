@@ -70,7 +70,7 @@ def load_document_image(file_path):
 def preprocess_cv2_image(img):
     """
     AI Preprocessing Pipeline for an in-memory BGR image:
-    1. Upscale small images to >= 1000px width for OCR fidelity
+    1. Upscale small images to >= 1400px width for OCR fidelity
     2. Grayscale conversion
     3. Fast non-local means denoising
     4. Adaptive Gaussian thresholding
@@ -79,8 +79,8 @@ def preprocess_cv2_image(img):
     Returns: (processed_binary_image, original_resized_bgr_image)
     """
     height, width = img.shape[:2]
-    if width < 1000:
-        scale = 1000.0 / width
+    if width < 1400:
+        scale = 1400.0 / width
         img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -190,14 +190,7 @@ def get_full_text_and_boxes(file_path):
     processed_img, original_img = preprocess_image(file_path)
     custom_config = r'--oem 3 --psm 6 -l eng'
 
-    # Single-pass execution: get full word-level data dictionary
-    data = pytesseract.image_to_data(
-        processed_img,
-        config=custom_config,
-        output_type=pytesseract.Output.DICT
-    )
-
-    words, extracted_text = _parse_ocr_data(data, processed_img, custom_config)
+    words, extracted_text = _extract_words_and_text(processed_img, original_img, custom_config)
 
     return {
         'text': extracted_text,
@@ -206,6 +199,80 @@ def get_full_text_and_boxes(file_path):
         'processed_image': processed_img,
         'is_text_file': False
     }
+
+
+def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --psm 6 -l eng'):
+    """
+    Multi-pass OCR extraction:
+    Pass 1: Standard structured layout extraction with PSM 6.
+    Pass 2: High-fidelity sparse text pass with PSM 11 on grayscale to capture
+            small/micro tokens (e.g. secondary Aadhaar numbers under ghost photos,
+            isolated serial numbers, and corner credentials).
+    Merges tokens, resolves overlaps favoring numeric clarity and higher confidence,
+    and sorts words spatially into natural reading order.
+    """
+    data1 = pytesseract.image_to_data(
+        processed_img,
+        config=custom_config,
+        output_type=pytesseract.Output.DICT
+    )
+    words, extracted_text = _parse_ocr_data(data1, processed_img, custom_config)
+
+    # Pass 2: High-fidelity sparse pass on grayscale image
+    if bgr_img is not None:
+        try:
+            gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+            h, w = gray.shape[:2]
+            scale = 1.5 if w <= 2000 else 1.0
+            if scale != 1.0:
+                scan_img = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+            else:
+                scan_img = gray
+
+            data2 = pytesseract.image_to_data(
+                scan_img,
+                config=r'--oem 3 --psm 11 -l eng',
+                output_type=pytesseract.Output.DICT
+            )
+
+            pass2_words = []
+            n_boxes = len(data2.get('text', []))
+            for i in range(n_boxes):
+                raw_text = data2['text'][i].strip()
+                raw_text = raw_text.replace('\u00a0', ' ').replace('\u200b', '').replace('\u2010', '-').replace('\u2013', '-').replace('\u2014', '-').replace('—', '-')
+                conf = int(data2['conf'][i]) if str(data2['conf'][i]).isdigit() or isinstance(data2['conf'][i], (int, float)) else -1
+                if raw_text and conf > 25:
+                    pass2_words.append({
+                        'text': raw_text,
+                        'confidence': max(0.0, min(1.0, conf / 100.0)),
+                        'x': int(data2['left'][i] / scale),
+                        'y': int(data2['top'][i] / scale),
+                        'w': int(data2['width'][i] / scale),
+                        'h': int(data2['height'][i] / scale),
+                    })
+
+            for p2 in pass2_words:
+                x, y, w, h = p2['x'], p2['y'], p2['w'], p2['h']
+                overlapping_idx = None
+                for j, ew in enumerate(words):
+                    if not (x + w < ew['x'] or x > ew['x'] + ew['w'] or y + h < ew['y'] or y > ew['y'] + ew['h']):
+                        overlapping_idx = j
+                        break
+                if overlapping_idx is None:
+                    words.append(p2)
+                else:
+                    ew = words[overlapping_idx]
+                    # If Pass 2 word is digits while Pass 1 was non-digits (e.g. 'esr' vs '6081'),
+                    # or Pass 2 has notably higher confidence, replace it
+                    if (p2['text'].isdigit() and not ew['text'].isdigit()) or (p2['confidence'] > ew['confidence'] + 0.15):
+                        words[overlapping_idx] = p2
+
+        except Exception as e:
+            logger.debug("Pass 2 sparse OCR pass skipped: %s", e)
+
+    # Sort words spatially into reading order (bucketed y, x)
+    words.sort(key=lambda item: (round(item.get('y', 0) / 20.0), item.get('x', 0)))
+    return words, extracted_text
 
 
 def get_pdf_pages_data(file_path):
@@ -245,13 +312,7 @@ def get_pdf_pages_data(file_path):
 
         processed_img, resized_bgr = preprocess_cv2_image(bgr_img)
 
-        data = pytesseract.image_to_data(
-            processed_img,
-            config=custom_config,
-            output_type=pytesseract.Output.DICT
-        )
-
-        words, page_text = _parse_ocr_data(data, processed_img, custom_config)
+        words, page_text = _extract_words_and_text(processed_img, resized_bgr, custom_config)
 
         pages.append({
             'page_num': page_idx,

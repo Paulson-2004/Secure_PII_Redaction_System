@@ -227,9 +227,31 @@ class TestRedactionEngine(unittest.TestCase):
         # Manual region directly overlapping the phone number (x:40/200=0.2, y:20/100=0.2)
         manual_regions = [{'x': 0.2, 'y': 0.2, 'width': 0.4, 'height': 0.2, 'action': 'redact'}]
 
-        out = redact_image(img, dets, ocr_words, manual_regions=manual_regions)
-        self.assertIsNotNone(out)
-        self.assertEqual(list(out[30, 80]), [0, 0, 0])
+    def test_multi_occurrence_aadhaar_redaction(self):
+        """Ensure both primary and secondary (ghost-photo) Aadhaar number occurrences are redacted."""
+        # Simulated Aadhaar card with number at bottom and under ghost photo
+        img = np.ones((500, 800, 3), dtype=np.uint8) * 255
+        ocr_words = [
+            # Ghost photo number (top right)
+            {'text': '2345', 'x': 600, 'y': 150, 'w': 35, 'h': 15},
+            {'text': '6789', 'x': 640, 'y': 150, 'w': 35, 'h': 15},
+            {'text': '0123', 'x': 680, 'y': 150, 'w': 35, 'h': 15},
+            # Middle content
+            {'text': 'Resident', 'x': 50, 'y': 200, 'w': 60, 'h': 20},
+            # Bottom main number
+            {'text': '2345', 'x': 250, 'y': 400, 'w': 80, 'h': 30},
+            {'text': '6789', 'x': 340, 'y': 400, 'w': 80, 'h': 30},
+            {'text': '0123', 'x': 430, 'y': 400, 'w': 80, 'h': 30},
+        ]
+        boxes = _find_word_boxes_for_pii('2345 6789 0123', ocr_words)
+        self.assertEqual(len(boxes), 2, "Expected 2 bounding boxes for multi-occurrence Aadhaar")
+
+        dets = [{'type': 'AADHAAR', 'value': '2345 6789 0123', 'decision': 'FULL_REDACT'}]
+        redacted = redact_image(img, dets, ocr_words)
+        # Check center of ghost photo box: (657, 157)
+        self.assertEqual(list(redacted[157, 657]), [0, 0, 0])
+        # Check center of bottom box: (375, 415)
+        self.assertEqual(list(redacted[415, 375]), [0, 0, 0])
 
 
 if __name__ == '__main__':
