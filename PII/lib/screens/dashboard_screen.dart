@@ -58,8 +58,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Offset? _panCurrentOffset;
   final ImagePicker _picker = ImagePicker();
   Map<String, dynamic>? _systemHealth;
-  String? _systemHealthError;
-  bool _loadingSystemHealth = true;
   HealthCheckStatus _healthStatus = HealthCheckStatus.checking;
   int _healthCheckGeneration = 0;
   Timer? _healthRetryTimer;
@@ -124,8 +122,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Timer? _healthRetryTimer;
-
   @override
   void dispose() {
     _healthRetryTimer?.cancel();
@@ -144,13 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _loadSystemHealth() async {
-    _healthRetryTimer?.cancel();
-    if (!mounted) return;
-    setState(() {
-      _loadingSystemHealth = true;
-    });
-  Future<void> loadSystemHealth({int retryCount = 0, int? generation}) async {
+  Future<void> _loadSystemHealth({int retryCount = 0, int? generation}) async {
     if (generation == null) {
       _healthRetryTimer?.cancel();
       _healthCheckGeneration++;
@@ -165,33 +155,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final health = await ApiService.getSystemHealth();
-      if (!mounted) return;
       if (!mounted || generation != _healthCheckGeneration) return;
       final data = health['data'] is Map<String, dynamic>
           ? health['data'] as Map<String, dynamic>
           : null;
-      if (data != null && data['backend'] == 'running') {
-      if ((data['backend'] == 'running' || data['backend'] == 'ok')) {
+      if (data != null && (data['backend'] == 'running' || data['backend'] == 'ok')) {
         setState(() {
           _systemHealth = data;
-          _systemHealthError = null;
-          _loadingSystemHealth = false;
           _healthStatus = HealthCheckStatus.connected;
         });
         return;
       }
       throw Exception(health['message'] ?? 'Backend response invalid');
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _healthCheckGeneration) return;
       setState(() {
         _systemHealth = null;
-        _systemHealthError = e.toString();
-        _loadingSystemHealth = false;
       });
-      if (!mounted || generation != _healthCheckGeneration) return;
 
-      // Auto-retry up to 3 times with 5s backoff if initial health check fails (e.g. cloud cold start)
-      if (retryCount < 3 && mounted) {
       // Auto-retry up to 3 times with 5s backoff if health check fails (e.g. cloud cold start)
       if (retryCount < 3) {
         setState(() {
@@ -202,10 +183,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final int nextRetry = retryCount + 1;
         final int targetGen = generation;
         _healthRetryTimer = Timer(const Duration(seconds: 5), () {
-          if (mounted && _systemHealth == null) {
-            loadSystemHealth(retryCount: retryCount + 1);
           if (mounted && targetGen == _healthCheckGeneration && _healthStatus != HealthCheckStatus.connected) {
-            loadSystemHealth(retryCount: nextRetry, generation: targetGen);
+            _loadSystemHealth(retryCount: nextRetry, generation: targetGen);
           }
         });
       } else {
@@ -218,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  final List<Map<String, dynamic>> docTypes = [
+  final List<Map<String, dynamic>> _docTypes = [
     {'value': 'aadhaar', 'label': 'Aadhaar Card', 'icon': Icons.badge_outlined},
     {'value': 'pan', 'label': 'PAN Card', 'icon': Icons.credit_card_outlined},
     {'value': 'driving_license', 'label': 'Driving License', 'icon': Icons.directions_car_outlined},
@@ -230,7 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     {'value': 'general', 'label': 'General Document', 'icon': Icons.document_scanner_outlined},
   ];
 
-  final List<Map<String, dynamic>> actions = [
+  final List<Map<String, dynamic>> _actions = [
     {
       'value': 'redact',
       'label': 'Redact',
@@ -254,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
-  final List<Map<String, dynamic>> detectionModes = [
+  final List<Map<String, dynamic>> _detectionModes = [
     {
       'value': 'automatic',
       'label': 'Automatic PII Detection',
@@ -278,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
-  final List<Map<String, dynamic>> aiModules = [
+  final List<Map<String, dynamic>> _aiModules = [
     {
       'name': 'OCR Engine',
       'detail': 'Tesseract + Preprocessing',
@@ -317,7 +296,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
-  Future<void> resolveSourceImageDimensions([Uint8List? directBytes]) async {
+  Future<void> _resolveSourceImageDimensions([Uint8List? directBytes]) async {
     try {
       Uint8List? bytes = directBytes ?? _selectedFileBytes;
       if (bytes == null && _selectedFile != null) {
@@ -340,7 +319,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> resolvePdfPageDimensions([Uint8List? directBytes]) async {
+  Future<void> _resolvePdfPageDimensions([Uint8List? directBytes]) async {
     try {
       Uint8List? bytes = directBytes ?? _selectedFileBytes;
       if (bytes == null && _selectedFile != null) {
@@ -362,11 +341,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Size getActiveDocumentSize(double canvasWidth, double canvasHeight) {
-    if (isImageFile()) {
+  Size _getActiveDocumentSize(double canvasWidth, double canvasHeight) {
+    if (_isImageFile()) {
       return _sourceImageSize ?? Size(canvasWidth, canvasHeight);
     }
-    if (isPdfFile()) {
+    if (_isPdfFile()) {
       if (_pdfPageSizes.containsKey(_selectedManualPage)) {
         return _pdfPageSizes[_selectedManualPage]!;
       }
@@ -378,7 +357,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return PdfPagePreset.a4Portrait.size;
   }
 
-  Future<void> pickFile() async {
+  Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: [
@@ -414,23 +393,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _selectedFile = File(picked.path!);
         }
       });
-      if (isImageFile()) {
+      if (_isImageFile()) {
         if (kIsWeb && picked.bytes != null) {
-          resolveSourceImageDimensions(picked.bytes);
+          _resolveSourceImageDimensions(picked.bytes);
         } else if (picked.path != null) {
-          resolveSourceImageDimensions();
+          _resolveSourceImageDimensions();
         }
-      } else if (isPdfFile()) {
+      } else if (_isPdfFile()) {
         if (kIsWeb && picked.bytes != null) {
-          resolvePdfPageDimensions(picked.bytes);
+          _resolvePdfPageDimensions(picked.bytes);
         } else if (picked.path != null) {
-          resolvePdfPageDimensions();
+          _resolvePdfPageDimensions();
         }
       }
     }
   }
 
-  Future<void> pickImage(ImageSource source) async {
+  Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _picker.pickImage(
       source: source,
       imageQuality: 90,
@@ -461,23 +440,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _sourceImageSize = null;
         });
       }
-      resolveSourceImageDimensions(bytes);
+      _resolveSourceImageDimensions(bytes);
     }
   }
 
-  bool isImageFile() {
+  bool _isImageFile() {
     final name = _selectedFileName ?? (_selectedFile?.path ?? '');
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
     return ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext);
   }
 
-  bool isPdfFile() {
+  bool _isPdfFile() {
     final name = _selectedFileName ?? (_selectedFile?.path ?? '');
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
     return ext == 'pdf';
   }
 
-  void showFileSourceSheet() {
+  void _showFileSourceSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -518,7 +497,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(fontSize: 12, color: AppTheme.slate500)),
                 onTap: () {
                   Navigator.pop(context);
-                  pickFile();
+                  _pickFile();
                 },
               ),
               const Divider(height: 16),
@@ -540,7 +519,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(fontSize: 12, color: AppTheme.slate500)),
                 onTap: () {
                   Navigator.pop(context);
-                  pickImage(ImageSource.gallery);
+                  _pickImage(ImageSource.gallery);
                 },
               ),
               if (!kIsWeb) ...[
@@ -563,7 +542,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(fontSize: 12, color: AppTheme.slate500)),
                   onTap: () {
                     Navigator.pop(context);
-                    pickImage(ImageSource.camera);
+                    _pickImage(ImageSource.camera);
                   },
                 ),
               ],
@@ -574,7 +553,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> processDocument() async {
+  Future<void> _processDocument() async {
     if (_selectedFile == null && _selectedFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a document first')),
@@ -606,16 +585,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (success && mounted) {
-      if (_systemHealth == null) {
-        loadSystemHealth();
-      }
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const ResultScreen()),
-      ).then((_) {
-        if (mounted && _systemHealth == null) {
-          loadSystemHealth();
-        }
-      });
+      );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -784,7 +756,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
 
                 // ── AI Modules Status Row ───────────────────────────────────
-                buildAiModulesRow(),
+                _buildAiModulesRow(),
 
                 const SizedBox(height: 24),
 
@@ -795,16 +767,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       Expanded(
                         flex: 7,
-                        child: buildUploadStudioCard(),
+                        child: _buildUploadStudioCard(),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
                         flex: 5,
                         child: Column(
                           children: [
-                            buildRecentActivityCard(),
+                            _buildRecentActivityCard(),
                             const SizedBox(height: 20),
-                            buildSystemHealthCard(),
+                            _buildSystemHealthCard(),
                           ],
                         ),
                       ),
@@ -813,11 +785,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 else
                   Column(
                     children: [
-                      buildUploadStudioCard(),
+                      _buildUploadStudioCard(),
                       const SizedBox(height: 20),
-                      buildRecentActivityCard(),
+                      _buildRecentActivityCard(),
                       const SizedBox(height: 20),
-                      buildSystemHealthCard(),
+                      _buildSystemHealthCard(),
                     ],
                   ),
 
@@ -829,7 +801,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 32),
 
                 // ── Dashboard Footer ─────────────────────────────────────────
-                buildDashboardFooter(),
+                _buildDashboardFooter(),
               ],
             ),
           ),
@@ -839,7 +811,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Dashboard Footer ───────────────────────────────────────────────────────
-  Widget buildDashboardFooter() {
+  Widget _buildDashboardFooter() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
       decoration: const BoxDecoration(
@@ -900,13 +872,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── AI Modules Bar ────────────────────────────────────────────────────────
-  Widget buildAiModulesRow() {
+  Widget _buildAiModulesRow() {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: aiModules.map((m) {
+          children: _aiModules.map((m) {
             final double cardWidth = constraints.maxWidth > 1100
                 ? (constraints.maxWidth - (5 * 10)) / 6
                 : constraints.maxWidth > 700
@@ -989,7 +961,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Upload & Redaction Studio (Primary Card) ──────────────────────────────
-  Widget buildUploadStudioCard() {
+  Widget _buildUploadStudioCard() {
     return Container(
       key: _uploadStudioKey,
       padding: const EdgeInsets.all(20),
@@ -1031,12 +1003,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 18),
 
           // ── Step 1: Document Type ──
-          stepHeader('1', 'Select Document Type'),
+          _stepHeader('1', 'Select Document Type'),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: docTypes.map((dt) {
+            children: _docTypes.map((dt) {
               final isSelected = dt['value'] == _selectedDocType;
               return ChoiceChip(
                 showCheckmark: false,
@@ -1067,14 +1039,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 22),
 
           // ── Step 2: Redaction Action ──
-          stepHeader('2', 'Choose Redaction Policy Action'),
+          _stepHeader('2', 'Choose Redaction Policy Action'),
           const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
               return Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: actions.map((act) {
+                children: _actions.map((act) {
                   final isSelected = act['value'] == _selectedAction;
                   final double width = constraints.maxWidth > 550
                       ? (constraints.maxWidth - (2 * 10)) / 3
@@ -1149,48 +1121,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 22),
 
           // ── Step 3: Document Upload Dropzone ──
-          stepHeader('3', 'Select or Drop Document'),
+          _stepHeader('3', 'Select or Drop Document'),
           const SizedBox(height: 10),
           if (_selectedFile != null || _selectedFileBytes != null)
             _FilePreviewCard(
               file: _selectedFile,
               fileBytes: _selectedFileBytes,
               fileName: _selectedFileName,
-              onReplace: showFileSourceSheet,
+              onReplace: _showFileSourceSheet,
             )
           else
-            _UploadPlaceholder(onTap: showFileSourceSheet),
+            _UploadPlaceholder(onTap: _showFileSourceSheet),
 
           const SizedBox(height: 22),
 
           // ── Step 4: Redaction & Detection Mode ──
-          stepHeader('4', 'Select Detection & Redaction Mode'),
+          _stepHeader('4', 'Select Detection & Redaction Mode'),
           const SizedBox(height: 10),
-          buildDetectionModeSelector(),
+          _buildDetectionModeSelector(),
 
           if (_selectedDetectionMode != 'automatic') ...[
             const SizedBox(height: 22),
-            stepHeader('5', 'Interactive Manual Selection Studio'),
+            _stepHeader('5', 'Interactive Manual Selection Studio'),
             const SizedBox(height: 10),
-            buildManualSelectionStudio(),
+            _buildManualSelectionStudio(),
           ],
 
           const SizedBox(height: 24),
 
           // ── Process Document Action ──
-          buildProcessButtonSection(),
+          _buildProcessButtonSection(),
         ],
       ),
     );
   }
 
-  Widget buildDetectionModeSelector() {
+  Widget _buildDetectionModeSelector() {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: detectionModes.map((dm) {
+          children: _detectionModes.map((dm) {
             final isSelected = dm['value'] == _selectedDetectionMode;
             final double width = constraints.maxWidth > 550
                 ? (constraints.maxWidth - (2 * 10)) / 3
@@ -1263,7 +1235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget buildManualSelectionStudio() {
+  Widget _buildManualSelectionStudio() {
     final bool hasDocument = _selectedFile != null || _selectedFileBytes != null;
     final int pageRegionsCount = _manualRegions.where((r) => r.page == _selectedManualPage).length;
 
@@ -1388,11 +1360,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
 
           // ── Detected Page Geometry Badge for PDF & Document Canvas ──
-          if (isPdfFile() || !isImageFile()) ...[
+          if (_isPdfFile() || !_isImageFile()) ...[
             const SizedBox(height: 8),
             Builder(
               builder: (context) {
-                final Size activePageSize = getActiveDocumentSize(720, 360);
+                final Size activePageSize = _getActiveDocumentSize(720, 360);
                 final String pageDesc = PdfPagePreset.describeSize(activePageSize);
                 final bool isDetected = _pdfPageSizes.containsKey(_selectedManualPage);
 
@@ -1468,7 +1440,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final double canvasWidth = constraints.maxWidth;
                 const double canvasHeight = 360.0;
 
-                final Size sourceSize = getActiveDocumentSize(canvasWidth, canvasHeight);
+                final Size sourceSize = _getActiveDocumentSize(canvasWidth, canvasHeight);
 
                 final geometry = ImageDisplayGeometry(
                   sourceSize: sourceSize,
@@ -1499,13 +1471,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       // Document background positioned strictly within geometry.imageRect
                       Positioned.fromRect(
                         rect: geometry.imageRect,
-                        child: isImageFile()
+                        child: _isImageFile()
                             ? (_selectedFileBytes != null
                                 ? Image.memory(_selectedFileBytes!, fit: BoxFit.fill)
                                 : (_selectedFile != null
                                     ? Image.file(_selectedFile!, fit: BoxFit.fill)
                                     : const SizedBox.shrink()))
-                            : buildDocumentSheetCanvas(
+                            : _buildDocumentSheetCanvas(
                                 geometry.imageRect.width,
                                 geometry.imageRect.height,
                               ),
@@ -1520,7 +1492,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             region.width,
                             region.height,
                           ),
-                          child: buildRegionOverlay(region),
+                          child: _buildRegionOverlay(region),
                         ),
 
                       // In-progress drag box clamped to image display rect
@@ -1661,7 +1633,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget buildRegionOverlay(ManualRegion region) {
+  Widget _buildRegionOverlay(ManualRegion region) {
     Color bg;
     String tag;
     switch ((region.action ?? 'redact').toLowerCase()) {
@@ -1723,7 +1695,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget buildDocumentSheetCanvas(double width, double height) {
+  Widget _buildDocumentSheetCanvas(double width, double height) {
     return Container(
       width: width,
       height: height,
@@ -1749,11 +1721,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      isPdfFile()
+                      _isPdfFile()
                           ? Icons.picture_as_pdf
                           : Icons.description_outlined,
                       size: 16,
-                      color: isPdfFile()
+                      color: _isPdfFile()
                           ? AppTheme.dangerColor
                           : AppTheme.primaryColor,
                     ),
@@ -1808,7 +1780,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget buildProcessButtonSection() {
+  Widget _buildProcessButtonSection() {
     return Consumer<DocumentProvider>(
       builder: (_, docProvider, __) {
         final canProcess = !docProvider.isProcessing &&
@@ -1829,7 +1801,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: canProcess ? processDocument : null,
+                onPressed: canProcess ? _processDocument : null,
                 icon: docProvider.isProcessing
                     ? const SizedBox(
                         width: 18,
@@ -1896,7 +1868,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Recent Activity Card ──────────────────────────────────────────────────
-  Widget buildRecentActivityCard() {
+  Widget _buildRecentActivityCard() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -2135,8 +2107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── System Health & Compliance Card ───────────────────────────────────────
-  Widget buildSystemHealthCard() {
-    final bool apiOnline = _systemHealth != null &&
+  Widget _buildSystemHealthCard() {
     final bool isChecking = _healthStatus == HealthCheckStatus.checking;
     final bool isConnected = _healthStatus == HealthCheckStatus.connected;
     final bool apiOnline = isConnected &&
@@ -2146,7 +2117,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _systemHealth!['api_gateway'] == 'online' ||
             _systemHealth!['status'] == 'healthy' ||
             _systemHealth!['status'] == 'degraded');
-    final bool dbOnline = _systemHealth != null &&
     final bool dbOnline = isConnected &&
         _systemHealth != null &&
         (_systemHealth!['database'] == 'connected' ||
@@ -2207,21 +2177,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                     splashRadius: 14,
                     tooltip: 'Refresh system health',
-                    onPressed: _loadingSystemHealth ? null : () => loadSystemHealth(),
-                    onPressed: isChecking ? null : () => loadSystemHealth(),
+                    onPressed: isChecking ? null : () => _loadSystemHealth(),
                   ),
                   const SizedBox(width: 4),
-                  if (_loadingSystemHealth)
                   if (isChecking) ...[
                     const SizedBox(
-                      width: 14,
-                      height: 14,
                       width: 12,
                       height: 12,
                       child: CircularProgressIndicator(strokeWidth: 1.5),
-                    )
-                  else if (_systemHealthError != null || !apiOnline)
-                    const Text('Offline', style: TextStyle(fontSize: 11, color: AppTheme.dangerColor))
                     ),
                     const SizedBox(width: 6),
                     const Text('Checking...', style: TextStyle(fontSize: 11, color: AppTheme.slate500)),
@@ -2230,46 +2193,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   else if (!dbOnline)
                     const Text('Degraded', style: TextStyle(fontSize: 11, color: Color(0xFFF59E0B)))
                   else
-                    const Text('Synced', style: TextStyle(fontSize: 11, color: AppTheme.accentColor)),
                     const Text('Connected', style: TextStyle(fontSize: 11, color: AppTheme.accentColor)),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 12),
-          healthRow(
+          _healthRow(
             'API Gateway (Flask)',
-            apiOnline ? 'ONLINE' : (_loadingSystemHealth ? 'CHECKING...' : 'DISCONNECTED'),
-            apiOnline ? AppTheme.accentColor : AppTheme.dangerColor,
             apiStatusText,
             apiStatusColor,
           ),
           const SizedBox(height: 8),
-          healthRow(
+          _healthRow(
             dbEngineLabel,
-            dbOnline ? 'CONNECTED' : (_loadingSystemHealth ? 'CHECKING...' : 'DISCONNECTED'),
-            dbOnline ? AppTheme.accentColor : AppTheme.dangerColor,
             dbStatusText,
             dbStatusColor,
           ),
           const SizedBox(height: 8),
-          healthRow(
+          _healthRow(
             'Policy Corpus',
             'ACTIVE CORPUS',
             AppTheme.primaryColor,
           ),
           const SizedBox(height: 8),
-          healthRow(
+          _healthRow(
             'Corpus Scope',
             'Legislation, Standards & Mappings',
             const Color(0xFF6D28D9),
           ),
         ],
       ),
-    )
+    );
   }
 
-  Widget healthRow(String label, String value, Color color) {
+  Widget _healthRow(String label, String value, Color color) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2304,7 +2262,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget stepHeader(String number, String title) {
+  Widget _stepHeader(String number, String title) {
     return Row(
       children: [
         Container(
@@ -2426,7 +2384,7 @@ class _FilePreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedFileName = fileName ??
-        ('selected_file');
+        (file != null ? file!.path.split(RegExp(r'[\\/]')).last : 'selected_file');
     final fileExt = resolvedFileName.contains('.')
         ? resolvedFileName.split('.').last.toLowerCase()
         : '';
@@ -2443,13 +2401,13 @@ class _FilePreviewCard extends StatelessWidget {
           if (isImageType && fileBytes != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-              child: Image.memory(fileBytes,
+              child: Image.memory(fileBytes!,
                   width: double.infinity, height: 180, fit: BoxFit.contain),
             )
           else if (isImageType && file != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-              child: Image.file(file,
+              child: Image.file(file!,
                   width: double.infinity, height: 180, fit: BoxFit.contain),
             ),
           Padding(
