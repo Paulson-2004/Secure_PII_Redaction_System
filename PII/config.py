@@ -31,7 +31,9 @@ class Config:
     CORS_ALLOWED_ORIGINS = _env('CORS_ALLOWED_ORIGINS', default=None)
 
     # Database
+    DATABASE_URL = _env('DATABASE_URL', default=None)
     USE_SQLITE = _env('USE_SQLITE', default='false').lower() in ('true', '1')
+    POSTGRES_POOL_SIZE = int(_env('POSTGRES_POOL_SIZE', default=5))
     MYSQL_HOST = _env('MYSQL_HOST', 'DB_HOST', default='127.0.0.1')
     MYSQL_PORT = int(_env('MYSQL_PORT', 'DB_PORT', default=3306))
     MYSQL_USER = _env('MYSQL_USER', 'DB_USER', default='root')

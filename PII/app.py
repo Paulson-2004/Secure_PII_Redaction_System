@@ -200,7 +200,7 @@ def health_check():
         {
             'backend': 'running',
             'database': 'connected' if db_ok else 'unavailable',
-            'database_engine': 'SQLite' if getattr(db, 'use_sqlite', False) else 'MySQL',
+            'database_engine': getattr(db, 'engine_name', 'SQLite' if getattr(db, 'use_sqlite', False) else 'MySQL'),
             'ai': ai_status,
         },
         200
