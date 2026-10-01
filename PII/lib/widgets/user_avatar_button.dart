@@ -25,17 +25,19 @@ class UserAvatarButton extends StatelessWidget {
           onTap: () => _showProfilePanel(context),
           borderRadius: BorderRadius.circular(24),
           child: Tooltip(
-            message: auth.isGuest ? 'Guest User (Click to sign in)' : 'Profile',
+            message: auth.isGuest
+                ? 'Guest profile and sign-in options'
+                : 'Profile, account, and settings',
             child: Container(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF1A73E8), Color(0xFF0D47A1)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: Colors.white,
                   width: 2,
@@ -52,7 +54,7 @@ class UserAvatarButton extends StatelessWidget {
                 child: auth.isGuest
                     ? const Icon(
                         Icons.person_outline,
-                        size: 20,
+                        size: 22,
                         color: Colors.white,
                       )
                     : Text(

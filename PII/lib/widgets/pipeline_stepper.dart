@@ -83,7 +83,7 @@ class PipelineStepper extends StatelessWidget {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 480;
+              final isCompact = constraints.maxWidth < 760;
               if (isCompact) {
                 return const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

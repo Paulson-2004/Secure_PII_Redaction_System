@@ -26,6 +26,16 @@ void main() {
     piiDetected: ['AADHAAR_NUMBER', 'PERSON', 'DATE_OF_BIRTH'],
     redactionSummary: 'Redacted 3 PII entities under UIDAI policy guidelines.',
     processedAt: '2026-09-29 11:45:00',
+    piiDetails: [
+      PiiEntityDetail(
+        type: 'AADHAAR_NUMBER',
+        confidence: 0.94,
+        decision: 'FULL_REDACT',
+        regulation: 'UIDAI guidance',
+        source: 'REGEX',
+        severity: 'CRITICAL',
+      ),
+    ],
   );
 
   Widget buildTestWidget({required double width, required double height}) {
@@ -41,7 +51,8 @@ void main() {
     );
   }
 
-  testWidgets('ResultScreen renders without BoxConstraints error at Desktop (1200px)',
+  testWidgets(
+      'ResultScreen renders without BoxConstraints error at Desktop (1200px)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -56,7 +67,8 @@ void main() {
     expect(find.text('Download Redacted File'), findsOneWidget);
   });
 
-  testWidgets('ResultScreen renders without BoxConstraints error at Tablet (768px)',
+  testWidgets(
+      'ResultScreen renders without BoxConstraints error at Tablet (768px)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(768, 1024);
     tester.view.devicePixelRatio = 1.0;
@@ -71,7 +83,8 @@ void main() {
     expect(find.text('Download Redacted File'), findsOneWidget);
   });
 
-  testWidgets('ResultScreen renders without BoxConstraints error at Mobile (360px)',
+  testWidgets(
+      'ResultScreen renders without BoxConstraints error at Mobile (360px)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;
@@ -84,9 +97,13 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Processing Result'), findsOneWidget);
     expect(find.text('Download Redacted File'), findsOneWidget);
+    expect(find.byType(DataTable), findsNothing);
+    expect(find.text('AADHAAR_NUMBER'), findsOneWidget);
+    expect(find.text('Policy: UIDAI guidance'), findsOneWidget);
   });
 
-  testWidgets('ResultScreen renders without BoxConstraints error at Ultra-Narrow Mobile (320px)',
+  testWidgets(
+      'ResultScreen renders without BoxConstraints error at Ultra-Narrow Mobile (320px)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1.0;

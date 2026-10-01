@@ -11,12 +11,14 @@ class DocumentProvider extends ChangeNotifier {
   DetectionResult? _lastResult;
   List<AuditLog> _auditLogs = [];
   bool _isLoadingLogs = false;
+  String _auditLogsError = '';
 
   bool get isProcessing => _isProcessing;
   String get errorMessage => _errorMessage;
   DetectionResult? get lastResult => _lastResult;
   List<AuditLog> get auditLogs => _auditLogs;
   bool get isLoadingLogs => _isLoadingLogs;
+  String get auditLogsError => _auditLogsError;
 
   Future<bool> processDocument({
     File? file,
@@ -46,7 +48,16 @@ class DocumentProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      final message = e.toString().replaceFirst('Exception: ', '');
+      if (message.startsWith('Please select a file') ||
+          message.startsWith('Please reselect the file')) {
+        _errorMessage = message;
+      } else if (message.startsWith('Processing timed out')) {
+        _errorMessage = 'Processing took too long. Please try again.';
+      } else {
+        _errorMessage =
+            'We could not process this document. Check your connection and try again.';
+      }
       _isProcessing = false;
       notifyListeners();
       return false;
@@ -55,14 +66,17 @@ class DocumentProvider extends ChangeNotifier {
 
   Future<void> loadAuditLogs() async {
     _isLoadingLogs = true;
+    _auditLogsError = '';
     notifyListeners();
     try {
       final data = await ApiService.getAuditLogs();
       _auditLogs = data
           .map((e) => AuditLog.fromJson(e as Map<String, dynamic>))
           .toList();
+      _auditLogsError = '';
     } catch (_) {
-      _auditLogs = [];
+      _auditLogsError =
+          'History could not be loaded. Check your connection and try again.';
     }
     _isLoadingLogs = false;
     notifyListeners();

@@ -159,7 +159,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final data = health['data'] is Map<String, dynamic>
           ? health['data'] as Map<String, dynamic>
           : null;
-      if (data != null && (data['backend'] == 'running' || data['backend'] == 'ok')) {
+      if (data != null &&
+          (data['backend'] == 'running' || data['backend'] == 'ok')) {
         setState(() {
           _systemHealth = data;
           _healthStatus = HealthCheckStatus.connected;
@@ -183,7 +184,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final int nextRetry = retryCount + 1;
         final int targetGen = generation;
         _healthRetryTimer = Timer(const Duration(seconds: 5), () {
-          if (mounted && targetGen == _healthCheckGeneration && _healthStatus != HealthCheckStatus.connected) {
+          if (mounted &&
+              targetGen == _healthCheckGeneration &&
+              _healthStatus != HealthCheckStatus.connected) {
             _loadSystemHealth(retryCount: nextRetry, generation: targetGen);
           }
         });
@@ -200,13 +203,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<Map<String, dynamic>> _docTypes = [
     {'value': 'aadhaar', 'label': 'Aadhaar Card', 'icon': Icons.badge_outlined},
     {'value': 'pan', 'label': 'PAN Card', 'icon': Icons.credit_card_outlined},
-    {'value': 'driving_license', 'label': 'Driving License', 'icon': Icons.directions_car_outlined},
-    {'value': 'voter_id', 'label': 'Voter ID', 'icon': Icons.how_to_vote_outlined},
-    {'value': 'passport', 'label': 'Passport', 'icon': Icons.airplanemode_active_outlined},
-    {'value': 'bank_statement', 'label': 'Bank Statement', 'icon': Icons.account_balance_outlined},
+    {
+      'value': 'driving_license',
+      'label': 'Driving License',
+      'icon': Icons.directions_car_outlined
+    },
+    {
+      'value': 'voter_id',
+      'label': 'Voter ID',
+      'icon': Icons.how_to_vote_outlined
+    },
+    {
+      'value': 'passport',
+      'label': 'Passport',
+      'icon': Icons.airplanemode_active_outlined
+    },
+    {
+      'value': 'bank_statement',
+      'label': 'Bank Statement',
+      'icon': Icons.account_balance_outlined
+    },
     {'value': 'invoice', 'label': 'Invoice', 'icon': Icons.receipt_outlined},
-    {'value': 'contract', 'label': 'Contract', 'icon': Icons.description_outlined},
-    {'value': 'general', 'label': 'General Document', 'icon': Icons.document_scanner_outlined},
+    {
+      'value': 'contract',
+      'label': 'Contract',
+      'icon': Icons.description_outlined
+    },
+    {
+      'value': 'general',
+      'label': 'General Document',
+      'icon': Icons.document_scanner_outlined
+    },
   ];
 
   final List<Map<String, dynamic>> _actions = [
@@ -222,7 +249,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'label': 'Mask',
       'tag': 'Partial',
       'icon': Icons.visibility_off_outlined,
-      'description': 'Conceal sensitive characters with format-preserving hashes'
+      'description':
+          'Conceal sensitive characters with format-preserving hashes'
     },
     {
       'value': 'blur',
@@ -239,21 +267,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'label': 'Automatic PII Detection',
       'tag': 'AI Pipeline',
       'icon': Icons.auto_awesome_outlined,
-      'description': 'Full AI pipeline: OCR + Regex + spaCy NER + Regulatory Policy Engine',
+      'description':
+          'Full AI pipeline: OCR + Regex + spaCy NER + Regulatory Policy Engine',
     },
     {
       'value': 'manual',
       'label': 'Manual Selection',
       'tag': 'User Regions Only',
       'icon': Icons.highlight_alt_outlined,
-      'description': 'Redact ONLY regions you explicitly select on the document. Outside text remains untouched.',
+      'description':
+          'Redact ONLY regions you explicitly select on the document. Outside text remains untouched.',
     },
     {
       'value': 'automatic_manual',
       'label': 'Automatic + Manual',
       'tag': 'Hybrid Combined',
       'icon': Icons.layers_outlined,
-      'description': 'Combines automated PII detections with your custom manual zones in a single pass.',
+      'description':
+          'Combines automated PII detections with your custom manual zones in a single pass.',
     },
   ];
 
@@ -492,7 +523,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: AppTheme.primaryColor),
                 ),
                 title: const Text('Local Files (PDF, Images, DOCX, TXT)',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 subtitle: const Text('Browse files from your system storage',
                     style: TextStyle(fontSize: 12, color: AppTheme.slate500)),
                 onTap: () {
@@ -514,7 +546,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: AppTheme.accentColor),
                 ),
                 title: const Text('Photo Gallery',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 subtitle: const Text('Select an image from gallery',
                     style: TextStyle(fontSize: 12, color: AppTheme.slate500)),
                 onTap: () {
@@ -537,8 +570,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: AppTheme.purpleColor),
                   ),
                   title: const Text('Camera Scanner',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: const Text('Capture a document photo with your camera',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text(
+                      'Capture a document photo with your camera',
                       style: TextStyle(fontSize: 12, color: AppTheme.slate500)),
                   onTap: () {
                     Navigator.pop(context);
@@ -564,7 +599,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_selectedDetectionMode != 'automatic' && _manualRegions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one manual region or switch mode to Automatic.'),
+          content: Text(
+              'Please select at least one manual region or switch mode to Automatic.'),
           backgroundColor: AppTheme.dangerColor,
         ),
       );
@@ -661,7 +697,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          if (screenWidth >= 768) ...[
+          if (screenWidth >= 900) ...[
             TextButton.icon(
               onPressed: () => launchExternalUrl(
                 'https://github.com/Paulson-2004/Secure_PII_Redaction_System',
@@ -713,52 +749,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Welcome Banner ──────────────────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            auth.isGuest
-                                ? 'Welcome to PrivLock 👋'
-                                : 'Welcome back, ${auth.username.isNotEmpty ? auth.username : 'Analyst'} 👋',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.slate900,
-                              letterSpacing: -0.5,
-                            ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final title = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          auth.isGuest
+                              ? 'Welcome to PrivLock'
+                              : 'Welcome back, ${auth.username.isNotEmpty ? auth.username : 'Analyst'}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.slate900,
+                            letterSpacing: -0.5,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            auth.isGuest
-                                ? 'Guest Mode: Redact sensitive PII without an account. Upload government IDs or documents to process immediately.'
-                                : 'Upload government IDs or business documents to automatically detect, mask, and redact sensitive PII.',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.slate600,
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          auth.isGuest
+                              ? 'Protect a document without an account. Guest files are temporary; sign in to keep your history.'
+                              : 'Protect a document with automatic detection, manual selection, or both.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.slate600,
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const PrivLockBadge(
-                      label: 'ALL SYSTEMS OPERATIONAL',
-                      icon: Icons.check_circle_outline,
-                      variant: BadgeVariant.success,
+                        ),
+                      ],
+                    );
+                    final status = PrivLockBadge(
+                      label: switch (_healthStatus) {
+                        HealthCheckStatus.checking => 'CHECKING SERVICE',
+                        HealthCheckStatus.connected => 'API REACHABLE',
+                        HealthCheckStatus.disconnected => 'SERVICE UNAVAILABLE',
+                      },
+                      icon: switch (_healthStatus) {
+                        HealthCheckStatus.checking => Icons.sync_outlined,
+                        HealthCheckStatus.connected =>
+                          Icons.check_circle_outline,
+                        HealthCheckStatus.disconnected =>
+                          Icons.cloud_off_outlined,
+                      },
+                      variant: switch (_healthStatus) {
+                        HealthCheckStatus.checking => BadgeVariant.slate,
+                        HealthCheckStatus.connected => BadgeVariant.success,
+                        HealthCheckStatus.disconnected => BadgeVariant.danger,
+                      },
                       isPill: true,
-                    ),
-                  ],
+                    );
+                    if (constraints.maxWidth < 640) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [title, const SizedBox(height: 10), status],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: title),
+                        const SizedBox(width: 12),
+                        status
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
-
-                // ── AI Modules Status Row ───────────────────────────────────
-                _buildAiModulesRow(),
-
-                const SizedBox(height: 24),
 
                 // ── Main Responsive Workspace ───────────────────────────────
                 if (isDesktop)
@@ -792,6 +846,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _buildSystemHealthCard(),
                     ],
                   ),
+
+                const SizedBox(height: 22),
+                // Secondary capability details follow the primary workflow.
+                _buildAiModulesRow(),
 
                 const SizedBox(height: 28),
 
@@ -985,12 +1043,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icon(Icons.upload_file_outlined,
                   size: 20, color: AppTheme.primaryColor),
               SizedBox(width: 8),
-              Text(
-                'Document Redaction Studio',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.slate900,
+              Expanded(
+                child: Text(
+                  'Document Redaction Studio',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.slate900,
+                  ),
                 ),
               ),
             ],
@@ -1030,7 +1092,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: isSelected ? Colors.white : AppTheme.slate800,
                 ),
                 onSelected: (val) {
-                  if (val) setState(() => _selectedDocType = dt['value'] as String);
+                  if (val) {
+                    setState(() => _selectedDocType = dt['value'] as String);
+                  }
                 },
               );
             }).toList(),
@@ -1053,13 +1117,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       : constraints.maxWidth;
 
                   return InkWell(
-                    onTap: () => setState(() => _selectedAction = act['value'] as String),
+                    onTap: () => setState(
+                        () => _selectedAction = act['value'] as String),
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       width: width,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.primaryLight : AppTheme.slate50,
+                        color: isSelected
+                            ? AppTheme.primaryLight
+                            : AppTheme.slate50,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isSelected
@@ -1169,7 +1236,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : constraints.maxWidth;
 
             return InkWell(
-              onTap: () => setState(() => _selectedDetectionMode = dm['value'] as String),
+              onTap: () => setState(
+                  () => _selectedDetectionMode = dm['value'] as String),
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 width: width,
@@ -1178,9 +1246,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: isSelected ? AppTheme.primaryLight : AppTheme.slate50,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSelected
-                        ? AppTheme.primaryColor
-                        : AppTheme.slate200,
+                    color:
+                        isSelected ? AppTheme.primaryColor : AppTheme.slate200,
                     width: isSelected ? 1.5 : 1,
                   ),
                 ),
@@ -1236,8 +1303,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildManualSelectionStudio() {
-    final bool hasDocument = _selectedFile != null || _selectedFileBytes != null;
-    final int pageRegionsCount = _manualRegions.where((r) => r.page == _selectedManualPage).length;
+    final bool hasDocument =
+        _selectedFile != null || _selectedFileBytes != null;
+    final int pageRegionsCount =
+        _manualRegions.where((r) => r.page == _selectedManualPage).length;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1255,7 +1324,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(Icons.crop_free_rounded, size: 18, color: AppTheme.primaryColor),
+                    const Icon(Icons.crop_free_rounded,
+                        size: 18, color: AppTheme.primaryColor),
                     const SizedBox(width: 8),
                     const Flexible(
                       child: Text(
@@ -1270,7 +1340,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryLight,
                         borderRadius: BorderRadius.circular(12),
@@ -1296,11 +1367,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _panCurrentOffset = null;
                     });
                   },
-                  icon: const Icon(Icons.delete_sweep_outlined, size: 16, color: AppTheme.dangerColor),
-                  label: const Text('Clear All', style: TextStyle(fontSize: 12, color: AppTheme.dangerColor)),
+                  icon: const Icon(Icons.delete_sweep_outlined,
+                      size: 16, color: AppTheme.dangerColor),
+                  label: const Text('Clear All',
+                      style:
+                          TextStyle(fontSize: 12, color: AppTheme.dangerColor)),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 ),
             ],
@@ -1313,48 +1388,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 12),
 
           // ── Page Selector (Support Multi-Page PDF & Documents) ──
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Target Page:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.slate700)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (int p = 1; p <= _maxSelectablePages; p++)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            label: Text('Page $p'),
-                            selected: _selectedManualPage == p,
-                            onSelected: (sel) {
-                              if (sel) setState(() => _selectedManualPage = p);
-                            },
-                            visualDensity: VisualDensity.compact,
-                            labelStyle: TextStyle(
-                              fontSize: 11,
-                              fontWeight: _selectedManualPage == p ? FontWeight.w700 : FontWeight.w500,
-                              color: _selectedManualPage == p ? Colors.white : AppTheme.slate700,
+              Row(
+                children: [
+                  const Text('Target Page:',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.slate700)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (int p = 1; p <= _maxSelectablePages; p++)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: Text('Page $p'),
+                                selected: _selectedManualPage == p,
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    setState(() => _selectedManualPage = p);
+                                  }
+                                },
+                                visualDensity: VisualDensity.standard,
+                                labelStyle: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: _selectedManualPage == p
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: _selectedManualPage == p
+                                      ? Colors.white
+                                      : AppTheme.slate700,
+                                ),
+                                selectedColor: AppTheme.primaryColor,
+                                backgroundColor: Colors.white,
+                              ),
                             ),
-                            selectedColor: AppTheme.primaryColor,
-                            backgroundColor: Colors.white,
-                          ),
-                        ),
-                      if (_maxSelectablePages < 20)
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline, size: 20, color: AppTheme.primaryColor),
-                          tooltip: 'Add Page',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => setState(() => _maxSelectablePages++),
-                        ),
-                    ],
+                          if (_maxSelectablePages < 20)
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline,
+                                  size: 20, color: AppTheme.primaryColor),
+                              tooltip: 'Add Page',
+                              visualDensity: VisualDensity.standard,
+                              constraints: const BoxConstraints(
+                                  minWidth: 48, minHeight: 48),
+                              onPressed: () =>
+                                  setState(() => _maxSelectablePages++),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-              Text(
-                'Page $_selectedManualPage: $pageRegionsCount zone(s)',
-                style: const TextStyle(fontSize: 11, color: AppTheme.slate500, fontStyle: FontStyle.italic),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Page $_selectedManualPage · $pageRegionsCount zone(s)',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.slate500,
+                      fontStyle: FontStyle.italic),
+                ),
               ),
             ],
           ),
@@ -1365,17 +1466,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Builder(
               builder: (context) {
                 final Size activePageSize = _getActiveDocumentSize(720, 360);
-                final String pageDesc = PdfPagePreset.describeSize(activePageSize);
-                final bool isDetected = _pdfPageSizes.containsKey(_selectedManualPage);
+                final String pageDesc =
+                    PdfPagePreset.describeSize(activePageSize);
+                final bool isDetected =
+                    _pdfPageSizes.containsKey(_selectedManualPage);
 
                 return Row(
                   children: [
-                    const Icon(Icons.aspect_ratio_outlined, size: 14, color: AppTheme.slate500),
+                    const Icon(Icons.aspect_ratio_outlined,
+                        size: 14, color: AppTheme.slate500),
                     const SizedBox(width: 6),
-                    const Text('Page Geometry:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.slate700)),
+                    const Text('Page Geometry:',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.slate700)),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(12),
@@ -1385,7 +1494,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isDetected ? Icons.lock_outline : Icons.description_outlined,
+                            isDetected
+                                ? Icons.lock_outline
+                                : Icons.description_outlined,
                             size: 12,
                             color: AppTheme.primaryColor,
                           ),
@@ -1424,7 +1535,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.touch_app_outlined, size: 36, color: AppTheme.slate400),
+                    Icon(Icons.touch_app_outlined,
+                        size: 36, color: AppTheme.slate400),
                     SizedBox(height: 8),
                     Text(
                       'Please select a document first to use the interactive selection canvas.',
@@ -1440,7 +1552,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final double canvasWidth = constraints.maxWidth;
                 const double canvasHeight = 360.0;
 
-                final Size sourceSize = _getActiveDocumentSize(canvasWidth, canvasHeight);
+                final Size sourceSize =
+                    _getActiveDocumentSize(canvasWidth, canvasHeight);
 
                 final geometry = ImageDisplayGeometry(
                   sourceSize: sourceSize,
@@ -1455,7 +1568,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF60A5FA), width: 1.5),
+                    border:
+                        Border.all(color: const Color(0xFF60A5FA), width: 1.5),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.04),
@@ -1473,9 +1587,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         rect: geometry.imageRect,
                         child: _isImageFile()
                             ? (_selectedFileBytes != null
-                                ? Image.memory(_selectedFileBytes!, fit: BoxFit.fill)
+                                ? Image.memory(_selectedFileBytes!,
+                                    fit: BoxFit.fill)
                                 : (_selectedFile != null
-                                    ? Image.file(_selectedFile!, fit: BoxFit.fill)
+                                    ? Image.file(_selectedFile!,
+                                        fit: BoxFit.fill)
                                     : const SizedBox.shrink()))
                             : _buildDocumentSheetCanvas(
                                 geometry.imageRect.width,
@@ -1484,7 +1600,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
 
                       // Existing regions for current page mapped back to display pixels
-                      for (final region in _manualRegions.where((r) => r.page == _selectedManualPage))
+                      for (final region in _manualRegions
+                          .where((r) => r.page == _selectedManualPage))
                         Positioned.fromRect(
                           rect: geometry.normalizedToLocalRect(
                             region.x,
@@ -1499,16 +1616,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       if (_panStartOffset != null && _panCurrentOffset != null)
                         Builder(
                           builder: (context) {
-                            final double clampedStartX = _panStartOffset!.dx.clamp(geometry.imageRect.left, geometry.imageRect.right);
-                            final double clampedStartY = _panStartOffset!.dy.clamp(geometry.imageRect.top, geometry.imageRect.bottom);
-                            final double clampedCurrX = _panCurrentOffset!.dx.clamp(geometry.imageRect.left, geometry.imageRect.right);
-                            final double clampedCurrY = _panCurrentOffset!.dy.clamp(geometry.imageRect.top, geometry.imageRect.bottom);
-                            final double left = math.min(clampedStartX, clampedCurrX);
-                            final double top = math.min(clampedStartY, clampedCurrY);
-                            final double width = (clampedCurrX - clampedStartX).abs();
-                            final double height = (clampedCurrY - clampedStartY).abs();
+                            final double clampedStartX = _panStartOffset!.dx
+                                .clamp(geometry.imageRect.left,
+                                    geometry.imageRect.right);
+                            final double clampedStartY = _panStartOffset!.dy
+                                .clamp(geometry.imageRect.top,
+                                    geometry.imageRect.bottom);
+                            final double clampedCurrX = _panCurrentOffset!.dx
+                                .clamp(geometry.imageRect.left,
+                                    geometry.imageRect.right);
+                            final double clampedCurrY = _panCurrentOffset!.dy
+                                .clamp(geometry.imageRect.top,
+                                    geometry.imageRect.bottom);
+                            final double left =
+                                math.min(clampedStartX, clampedCurrX);
+                            final double top =
+                                math.min(clampedStartY, clampedCurrY);
+                            final double width =
+                                (clampedCurrX - clampedStartX).abs();
+                            final double height =
+                                (clampedCurrY - clampedStartY).abs();
 
-                            if (width < 2 || height < 2) return const SizedBox.shrink();
+                            if (width < 2 || height < 2) {
+                              return const SizedBox.shrink();
+                            }
 
                             return Positioned(
                               left: left,
@@ -1517,8 +1648,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               height: height,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.25),
-                                  border: Border.all(color: AppTheme.primaryColor, width: 2),
+                                  color: AppTheme.primaryColor
+                                      .withValues(alpha: 0.25),
+                                  border: Border.all(
+                                      color: AppTheme.primaryColor, width: 2),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Center(
@@ -1552,29 +1685,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           });
                         },
                         onPanEnd: (details) {
-                          if (_panStartOffset != null && _panCurrentOffset != null) {
-                            final Rect normRect = geometry.selectionToNormalizedRect(
+                          if (_panStartOffset != null &&
+                              _panCurrentOffset != null) {
+                            final Rect normRect =
+                                geometry.selectionToNormalizedRect(
                               _panStartOffset!,
                               _panCurrentOffset!,
                             );
 
-                            final double pixelW = normRect.width * geometry.imageRect.width;
-                            final double pixelH = normRect.height * geometry.imageRect.height;
+                            final double pixelW =
+                                normRect.width * geometry.imageRect.width;
+                            final double pixelH =
+                                normRect.height * geometry.imageRect.height;
 
                             if (pixelW >= 10 && pixelH >= 10) {
                               if (_manualRegions.length >= 50) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Maximum 50 manual regions reached.')),
+                                  const SnackBar(
+                                      content: Text(
+                                          'Maximum 50 manual regions reached.')),
                                 );
                               } else {
                                 setState(() {
                                   _manualRegions.add(
                                     ManualRegion(
                                       id: _nextRegionId++,
-                                      x: double.parse(normRect.left.toStringAsFixed(4)),
-                                      y: double.parse(normRect.top.toStringAsFixed(4)),
-                                      width: double.parse(normRect.width.toStringAsFixed(4)),
-                                      height: double.parse(normRect.height.toStringAsFixed(4)),
+                                      x: double.parse(
+                                          normRect.left.toStringAsFixed(4)),
+                                      y: double.parse(
+                                          normRect.top.toStringAsFixed(4)),
+                                      width: double.parse(
+                                          normRect.width.toStringAsFixed(4)),
+                                      height: double.parse(
+                                          normRect.height.toStringAsFixed(4)),
                                       page: _selectedManualPage,
                                       action: _selectedAction,
                                     ),
@@ -1616,7 +1759,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   label: Text(
                     'P${r.page}: ${(r.action ?? 'redact').toUpperCase()} (${(r.x * 100).toStringAsFixed(0)}%, ${(r.y * 100).toStringAsFixed(0)}%)',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w600),
                   ),
                   onDeleted: () {
                     setState(() {
@@ -1732,8 +1876,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        _selectedFileName ?? 'Document Page $_selectedManualPage',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.slate800),
+                        _selectedFileName ??
+                            'Document Page $_selectedManualPage',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.slate800),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1750,7 +1898,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: Text(
                   'PAGE $_selectedManualPage',
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.slate600),
+                  style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.slate600),
                 ),
               ),
             ],
@@ -1772,7 +1923,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const Center(
             child: Text(
               'Drag rectangle anywhere on this page canvas to set redaction bounds',
-              style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AppTheme.slate400),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: AppTheme.slate400),
             ),
           ),
         ],
@@ -1785,7 +1939,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (_, docProvider, __) {
         final canProcess = !docProvider.isProcessing &&
             (_selectedFile != null || _selectedFileBytes != null) &&
-            (_selectedDetectionMode == 'automatic' || _manualRegions.isNotEmpty);
+            (_selectedDetectionMode == 'automatic' ||
+                _manualRegions.isNotEmpty);
 
         final String buttonLabel = docProvider.isProcessing
             ? 'Processing Document with AI Pipeline...'
@@ -1832,7 +1987,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (docProvider.isProcessing) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryLight,
                   borderRadius: BorderRadius.circular(8),
@@ -1986,6 +2142,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               }
 
+              if (docProvider.auditLogsError.isNotEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningLight,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                    border: Border.all(
+                        color: AppTheme.warningColor.withValues(alpha: 0.35)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Recent activity is unavailable',
+                          style: AppTheme.sectionTitle),
+                      const SizedBox(height: 4),
+                      Text(docProvider.auditLogsError,
+                          style: AppTheme.bodySecondary),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => docProvider.loadAuditLogs(),
+                        icon: const Icon(Icons.refresh_outlined),
+                        label: const Text('Try again'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
               if (logs.isEmpty) {
                 return Container(
                   width: double.infinity,
@@ -2006,7 +2191,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       SizedBox(height: 2),
                       Text(
                         'Uploaded files will appear here with audit details.',
-                        style: TextStyle(fontSize: 11, color: AppTheme.slate400),
+                        style:
+                            TextStyle(fontSize: 11, color: AppTheme.slate400),
                       ),
                     ],
                   ),
@@ -2085,7 +2271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             messenger.showSnackBar(
                               SnackBar(
                                 content: Text(success
-                                    ? 'Downloaded ${log.filename}'
+                                    ? 'Redacted file downloaded'
                                     : 'Download failed'),
                                 backgroundColor: success
                                     ? AppTheme.accentColor
@@ -2126,16 +2312,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? 'Database Engine ($rawEngine)'
         : 'Database Engine';
 
-    final String apiStatusText = isChecking
-        ? 'Checking...'
-        : (apiOnline ? 'Connected' : 'Disconnected');
+    final String apiStatusText =
+        isChecking ? 'Checking...' : (apiOnline ? 'Connected' : 'Disconnected');
     final Color apiStatusColor = isChecking
         ? AppTheme.slate500
         : (apiOnline ? AppTheme.accentColor : AppTheme.dangerColor);
 
-    final String dbStatusText = isChecking
-        ? 'Checking...'
-        : (dbOnline ? 'Connected' : 'Disconnected');
+    final String dbStatusText =
+        isChecking ? 'Checking...' : (dbOnline ? 'Connected' : 'Disconnected');
     final Color dbStatusColor = isChecking
         ? AppTheme.slate500
         : (dbOnline ? AppTheme.accentColor : AppTheme.dangerColor);
@@ -2150,31 +2334,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const title = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.monitor_heart_outlined,
                       size: 18, color: AppTheme.accentColor),
                   SizedBox(width: 8),
-                  Text(
-                    'Live System Monitor',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.slate900,
+                  Flexible(
+                    child: Text(
+                      'Live System Monitor',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.slate900,
+                      ),
                     ),
                   ),
                 ],
-              ),
-              Row(
+              );
+              final status = Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.refresh, size: 16, color: AppTheme.slate500),
+                    icon: const Icon(Icons.refresh,
+                        size: 16, color: AppTheme.slate500),
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
                     splashRadius: 14,
                     tooltip: 'Refresh system health',
                     onPressed: isChecking ? null : () => _loadSystemHealth(),
@@ -2187,16 +2377,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: CircularProgressIndicator(strokeWidth: 1.5),
                     ),
                     const SizedBox(width: 6),
-                    const Text('Checking...', style: TextStyle(fontSize: 11, color: AppTheme.slate500)),
+                    const Text('Checking...',
+                        style:
+                            TextStyle(fontSize: 11, color: AppTheme.slate500)),
                   ] else if (!apiOnline)
-                    const Text('Disconnected', style: TextStyle(fontSize: 11, color: AppTheme.dangerColor))
+                    const Text('Disconnected',
+                        style: TextStyle(
+                            fontSize: 11, color: AppTheme.dangerColor))
                   else if (!dbOnline)
-                    const Text('Degraded', style: TextStyle(fontSize: 11, color: Color(0xFFF59E0B)))
+                    const Text('Degraded',
+                        style:
+                            TextStyle(fontSize: 11, color: Color(0xFFF59E0B)))
                   else
-                    const Text('Connected', style: TextStyle(fontSize: 11, color: AppTheme.accentColor)),
+                    const Text('Connected',
+                        style: TextStyle(
+                            fontSize: 11, color: AppTheme.accentColor)),
                 ],
-              ),
-            ],
+              );
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    title,
+                    Align(alignment: Alignment.centerRight, child: status),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  const Expanded(child: title),
+                  status,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           _healthRow(
@@ -2229,9 +2442,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _healthRow(String label, String value, Color color) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
+          flex: 2,
           child: Text(
             label,
             style: const TextStyle(fontSize: 12, color: AppTheme.slate600),
@@ -2239,24 +2452,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: color,
+        Flexible(
+          flex: 3,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -2284,12 +2505,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.slate800,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.slate800,
+            ),
           ),
         ),
       ],
@@ -2356,7 +2581,8 @@ class _UploadPlaceholder extends StatelessWidget {
               label: const Text('Browse Files'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 32),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 side: const BorderSide(color: AppTheme.primaryColor),
                 foregroundColor: AppTheme.primaryColor,
               ),
@@ -2384,7 +2610,9 @@ class _FilePreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedFileName = fileName ??
-        (file != null ? file!.path.split(RegExp(r'[\\/]')).last : 'selected_file');
+        (file != null
+            ? file!.path.split(RegExp(r'[\\/]')).last
+            : 'selected_file');
     final fileExt = resolvedFileName.contains('.')
         ? resolvedFileName.split('.').last.toLowerCase()
         : '';
@@ -2400,13 +2628,15 @@ class _FilePreviewCard extends StatelessWidget {
         children: [
           if (isImageType && fileBytes != null)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(10)),
               child: Image.memory(fileBytes!,
                   width: double.infinity, height: 180, fit: BoxFit.contain),
             )
           else if (isImageType && file != null)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(10)),
               child: Image.file(file!,
                   width: double.infinity, height: 180, fit: BoxFit.contain),
             ),
@@ -2457,7 +2687,8 @@ class _FilePreviewCard extends StatelessWidget {
                   label: const Text('Change'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 32),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   ),
                 ),
               ],

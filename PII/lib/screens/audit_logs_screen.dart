@@ -182,6 +182,39 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
             );
           }
 
+          if (provider.auditLogsError.isNotEmpty) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_off_outlined,
+                          size: 36, color: AppTheme.warningColor),
+                      const SizedBox(height: 12),
+                      const Text('History is temporarily unavailable',
+                          style: AppTheme.sectionTitle,
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 6),
+                      Text(provider.auditLogsError,
+                          style: AppTheme.bodySecondary,
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () =>
+                            context.read<DocumentProvider>().loadAuditLogs(),
+                        icon: const Icon(Icons.refresh_outlined),
+                        label: const Text('Try again'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
           final allLogs = provider.auditLogs;
           final filteredLogs = _filterLogs(allLogs);
           final totalPii =
@@ -364,7 +397,8 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
             onChanged: (val) => setState(() => _searchQuery = val.trim()),
             decoration: InputDecoration(
               hintText: 'Search by filename, document type, or audit ID...',
-              hintStyle: const TextStyle(fontSize: 13, color: AppTheme.slate400),
+              hintStyle:
+                  const TextStyle(fontSize: 13, color: AppTheme.slate400),
               prefixIcon:
                   const Icon(Icons.search, size: 18, color: AppTheme.slate400),
               suffixIcon: _searchQuery.isNotEmpty
@@ -412,8 +446,7 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
                 labelStyle: TextStyle(
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color:
-                      isSelected ? AppTheme.primaryColor : AppTheme.slate600,
+                  color: isSelected ? AppTheme.primaryColor : AppTheme.slate600,
                 ),
                 backgroundColor: AppTheme.slate50,
                 side: BorderSide(
@@ -643,8 +676,8 @@ class _AuditLogItemCard extends StatelessWidget {
                   label: const Text('Download'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 34),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     textStyle: const TextStyle(fontSize: 12),
                   ),
                 ),

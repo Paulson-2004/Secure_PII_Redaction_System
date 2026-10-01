@@ -97,8 +97,8 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
-    } catch (e) {
-      _errorMessage = 'Connection error. ${e.toString()}';
+    } catch (_) {
+      _errorMessage = 'Unable to connect. Check your connection and try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -128,8 +128,9 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
-    } catch (e) {
-      _errorMessage = 'Registration failed. ${e.toString()}';
+    } catch (_) {
+      _errorMessage =
+          'We could not create your account. Check your connection and try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -156,8 +157,9 @@ class AuthProvider extends ChangeNotifier {
       _errorMessage = result['message'] ?? 'Failed to change password';
       notifyListeners();
       return false;
-    } catch (e) {
-      _errorMessage = 'Password update failed. ${e.toString()}';
+    } catch (_) {
+      _errorMessage =
+          'Password update failed. Check your connection and try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -165,8 +167,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await ApiService.logout();
+    var serverLogoutConfirmed = false;
+    try {
+      final result = await ApiService.logout();
+      serverLogoutConfirmed = result['success'] == true;
+    } catch (_) {
+      // Local sign-out must still complete if the server cannot be reached.
+    }
+
     await clearLocalSession();
+    if (!serverLogoutConfirmed) {
+      _errorMessage =
+          'Signed out on this device. Server sign-out could not be confirmed.';
+      notifyListeners();
+    }
   }
 
   Future<void> clearLocalSession() async {
@@ -174,10 +188,11 @@ class AuthProvider extends ChangeNotifier {
     _isGuest = false;
     _username = '';
     _email = '';
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    _errorMessage = '';
     ApiService.clearSessionCookie();
     ApiService.clearAuthToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
     notifyListeners();
   }
 }

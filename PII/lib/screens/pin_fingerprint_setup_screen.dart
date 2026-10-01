@@ -98,9 +98,9 @@ class _PINFingerprintSetupScreenState extends State<PINFingerprintSetupScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _errorMessage = 'Error: ${e.toString()}';
+        _errorMessage = 'PIN setup failed. Please try again.';
         _isLoading = false;
       });
     }
@@ -109,7 +109,8 @@ class _PINFingerprintSetupScreenState extends State<PINFingerprintSetupScreen> {
   Future<void> _enrollFingerprint() async {
     if (kIsWeb) {
       setState(() {
-        _errorMessage = 'Fingerprint enrollment is not available in the browser.';
+        _errorMessage =
+            'Fingerprint enrollment is not available in the browser.';
       });
       return;
     }
@@ -142,9 +143,9 @@ class _PINFingerprintSetupScreenState extends State<PINFingerprintSetupScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _errorMessage = 'Fingerprint enrollment failed: ${e.toString()}';
+        _errorMessage = 'Fingerprint enrollment failed. Please try again.';
         _isLoading = false;
       });
     }

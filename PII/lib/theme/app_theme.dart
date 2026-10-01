@@ -30,6 +30,24 @@ class AppTheme {
   static const Color warningLight = Color(0xFFFFFBEB);
   static const Color purpleLight = Color(0xFFF5F3FF);
 
+  // Shared layout and surface tokens used across screens.
+  static const double radiusSmall = 8;
+  static const double radiusMedium = 12;
+  static const Color borderColor = slate200;
+  static const Color elevatedSurfaceColor = Colors.white;
+
+  static const TextStyle sectionTitle = TextStyle(
+    color: slate900,
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.2,
+  );
+  static const TextStyle bodySecondary = TextStyle(
+    color: slate600,
+    fontSize: 14,
+    height: 1.45,
+  );
+
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     fontFamily: 'Inter',
@@ -54,12 +72,12 @@ class AppTheme {
       ),
     ),
     cardTheme: CardThemeData(
-      color: cardColor,
+      color: elevatedSurfaceColor,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: slate200, width: 1),
+        borderRadius: BorderRadius.circular(radiusMedium),
+        side: const BorderSide(color: borderColor, width: 1),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -69,7 +87,8 @@ class AppTheme {
         elevation: 0,
         minimumSize: const Size(0, 42),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSmall)),
         textStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
@@ -82,8 +101,9 @@ class AppTheme {
         foregroundColor: slate700,
         minimumSize: const Size(0, 42),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        side: const BorderSide(color: slate200, width: 1),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSmall)),
+        side: const BorderSide(color: borderColor, width: 1),
         textStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,

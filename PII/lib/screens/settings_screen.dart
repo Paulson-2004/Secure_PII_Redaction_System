@@ -21,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _fingerprintEnabled = false;
   bool _isLoadingSecurity = true;
   String _healthStatus = 'Checking...';
+  String? _securityStatusError;
   bool _isCheckingHealth = false;
 
   @override
@@ -40,12 +41,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _pinEnabled = data['pin_enabled'] == true;
           _fingerprintEnabled = data['fingerprint_enabled'] == true;
           _isLoadingSecurity = false;
+          _securityStatusError = null;
         });
       } else {
-        setState(() => _isLoadingSecurity = false);
+        setState(() {
+          _isLoadingSecurity = false;
+          _securityStatusError = 'Security options could not be loaded.';
+        });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingSecurity = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingSecurity = false;
+          _securityStatusError = 'Security options could not be loaded.';
+        });
+      }
     }
   }
 
@@ -61,14 +71,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       } else {
         setState(() {
-          _healthStatus = 'Backend error: ${res['status']}';
+          _healthStatus = 'Service unavailable. Try again.';
           _isCheckingHealth = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _healthStatus = 'Connection error: $e';
+          _healthStatus = 'Service unavailable. Try again.';
           _isCheckingHealth = false;
         });
       }
@@ -107,6 +117,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // ── Header Banner ──────────────────────────────────────────
                 _buildHeaderBanner(),
                 const SizedBox(height: 18),
+                if (_securityStatusError != null) ...[
+                  Material(
+                    color: AppTheme.warningLight,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              color: AppTheme.warningColor),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Text(_securityStatusError!,
+                                  style: AppTheme.bodySecondary)),
+                          TextButton(
+                            onPressed: () {
+                              setState(() => _isLoadingSecurity = true);
+                              _loadSecurityStatus();
+                            },
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // ── Section 1: Security & Credentials ───────────────────────
                 _buildSectionCard(
@@ -280,9 +318,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
-                                color: _healthStatus.contains('Connected')
+                                color: _healthStatus ==
+                                        'Connected & Operational (HTTP 200)'
                                     ? AppTheme.accentColor
-                                    : AppTheme.dangerColor,
+                                    : (_isCheckingHealth
+                                        ? AppTheme.slate500
+                                        : AppTheme.dangerColor),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),

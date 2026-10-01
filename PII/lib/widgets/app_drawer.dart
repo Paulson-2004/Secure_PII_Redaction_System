@@ -206,14 +206,6 @@ class _AppDrawerState extends State<AppDrawer> {
               onTap: _navigateToAuditLogs,
             ),
 
-            _buildDrawerItem(
-              icon: Icons.lock_outline,
-              label: 'Secure Files',
-              routeName: 'secure',
-              isSelected: false,
-              onTap: _navigateToAuditLogs,
-            ),
-
             const SizedBox(height: 12),
 
             // ──────────────────────────────────────────
@@ -293,8 +285,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     );
                   }
                 },
-                icon: Icon(
-                    auth.isGuest ? Icons.exit_to_app : Icons.logout,
+                icon: Icon(auth.isGuest ? Icons.exit_to_app : Icons.logout,
                     size: 16),
                 label: Text(auth.isGuest ? 'Exit Guest Mode' : 'Sign Out'),
                 style: ElevatedButton.styleFrom(
@@ -322,7 +313,8 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
                 tileColor: AppTheme.slate50,
                 dense: true,
-                leading: const Icon(Icons.code_rounded, color: AppTheme.slate700, size: 20),
+                leading: const Icon(Icons.code_rounded,
+                    color: AppTheme.slate700, size: 20),
                 title: const Text(
                   'View Source',
                   style: TextStyle(
@@ -335,7 +327,8 @@ class _AppDrawerState extends State<AppDrawer> {
                   'GitHub Repository',
                   style: TextStyle(fontSize: 10, color: AppTheme.slate500),
                 ),
-                trailing: const Icon(Icons.open_in_new_rounded, size: 14, color: AppTheme.slate400),
+                trailing: const Icon(Icons.open_in_new_rounded,
+                    size: 14, color: AppTheme.slate400),
                 onTap: () {
                   Navigator.pop(context);
                   launchExternalUrl(

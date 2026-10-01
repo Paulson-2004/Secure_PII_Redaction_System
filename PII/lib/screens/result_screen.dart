@@ -153,8 +153,7 @@ class ResultScreen extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const RegisterScreen()),
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
                     );
                   },
                   icon: const Icon(Icons.person_add_outlined, size: 14),
@@ -162,8 +161,8 @@ class ResultScreen extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF15803D),
                     side: const BorderSide(color: Color(0xFF16A34A)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     textStyle: const TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w600),
                   ),
@@ -196,89 +195,89 @@ class ResultScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppTheme.successLight,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.verified_outlined,
-                      color: AppTheme.accentColor,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Redaction Complete',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.slate900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          result.originalFilename,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.slate600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppTheme.successLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.verified_outlined,
+                  color: AppTheme.accentColor,
+                  size: 22,
+                ),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const PrivLockBadge(
-                    label: 'PII PROTECTED',
-                    icon: Icons.shield_outlined,
-                    variant: BadgeVariant.success,
-                    isPill: true,
-                  ),
-                  PrivLockBadge(
-                    label: result.docType.toUpperCase(),
-                    variant: BadgeVariant.primary,
-                  ),
-                  PrivLockBadge(
-                    label: result.action.toUpperCase(),
-                    variant: BadgeVariant.purple,
-                  ),
-                  if (result.pageCount > 1)
-                    PrivLockBadge(
-                      label: '${result.pageCount} PAGES',
-                      variant: BadgeVariant.slate,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Redaction Complete',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.slate900,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  Text(
-                    '•  Processed at ${result.processedAt.isNotEmpty ? result.processedAt : 'Just now'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.slate500,
+                    const SizedBox(height: 2),
+                    Text(
+                      result.originalFilename,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.slate600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
-        );
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const PrivLockBadge(
+                label: 'PII PROTECTED',
+                icon: Icons.shield_outlined,
+                variant: BadgeVariant.success,
+                isPill: true,
+              ),
+              PrivLockBadge(
+                label: result.docType.toUpperCase(),
+                variant: BadgeVariant.primary,
+              ),
+              PrivLockBadge(
+                label: result.action.toUpperCase(),
+                variant: BadgeVariant.purple,
+              ),
+              if (result.pageCount > 1)
+                PrivLockBadge(
+                  label: '${result.pageCount} PAGES',
+                  variant: BadgeVariant.slate,
+                ),
+              Text(
+                '•  Processed at ${result.processedAt.isNotEmpty ? result.processedAt : 'Just now'}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.slate500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Metrics Row (Report Fig 9.3) ──────────────────────────────────────────
@@ -406,74 +405,88 @@ class ResultScreen extends StatelessWidget {
               ),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 800),
-                child: DataTable(
-                  headingRowColor:
-                      WidgetStateProperty.all(AppTheme.slate50),
-                  horizontalMargin: 12,
-                  columnSpacing: 18,
-                  headingTextStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.slate500,
-                    letterSpacing: 0.5,
-                  ),
-                  columns: const [
-                    DataColumn(label: Text('#')),
-                    DataColumn(label: Text('PII TYPE')),
-                    DataColumn(label: Text('SOURCE')),
-                    DataColumn(label: Text('CONFIDENCE')),
-                    DataColumn(label: Text('DECISION')),
-                    DataColumn(label: Text('SEVERITY')),
-                    DataColumn(label: Text('REGULATORY MANDATE')),
-                  ],
-                  rows: List.generate(details.length, (index) {
-                    final item = details[index];
-                    return DataRow(
-                      cells: [
-                        DataCell(Text('${index + 1}',
-                            style: const TextStyle(
-                                fontSize: 12, color: AppTheme.slate500))),
-                        DataCell(
-                          Text(
-                            item.type,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.slate900,
-                            ),
-                          ),
-                        ),
-                        DataCell(PrivLockBadge.source(item.source)),
-                        DataCell(
-                          Text(
-                            '${(item.confidence * 100).toInt()}%',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.slate700,
-                            ),
-                          ),
-                        ),
-                        DataCell(PrivLockBadge.decision(item.decision)),
-                        DataCell(PrivLockBadge.severity(item.severity)),
-                        DataCell(
-                          Text(
-                            item.regulation,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.slate600,
-                            ),
-                          ),
-                        ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 680) {
+                  return Column(
+                    children: [
+                      for (var index = 0; index < details.length; index++) ...[
+                        if (index > 0) const SizedBox(height: 10),
+                        _buildDetectionDetailCard(index + 1, details[index]),
                       ],
-                    );
-                  }),
-                ),
-              ),
+                    ],
+                  );
+                }
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 800),
+                    child: DataTable(
+                      headingRowColor:
+                          WidgetStateProperty.all(AppTheme.slate50),
+                      horizontalMargin: 12,
+                      columnSpacing: 18,
+                      headingTextStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.slate500,
+                        letterSpacing: 0.5,
+                      ),
+                      columns: const [
+                        DataColumn(label: Text('#')),
+                        DataColumn(label: Text('PII TYPE')),
+                        DataColumn(label: Text('SOURCE')),
+                        DataColumn(label: Text('CONFIDENCE')),
+                        DataColumn(label: Text('DECISION')),
+                        DataColumn(label: Text('SEVERITY')),
+                        DataColumn(label: Text('REGULATORY MANDATE')),
+                      ],
+                      rows: List.generate(details.length, (index) {
+                        final item = details[index];
+                        return DataRow(
+                          cells: [
+                            DataCell(Text('${index + 1}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppTheme.slate500))),
+                            DataCell(
+                              Text(
+                                item.type,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.slate900,
+                                ),
+                              ),
+                            ),
+                            DataCell(PrivLockBadge.source(item.source)),
+                            DataCell(
+                              Text(
+                                '${(item.confidence * 100).toInt()}%',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.slate700,
+                                ),
+                              ),
+                            ),
+                            DataCell(PrivLockBadge.decision(item.decision)),
+                            DataCell(PrivLockBadge.severity(item.severity)),
+                            DataCell(
+                              Text(
+                                item.regulation,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.slate600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                    ),
+                  ),
+                );
+              },
             ),
           const SizedBox(height: 12),
           Container(
@@ -500,6 +513,49 @@ class ResultScreen extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetectionDetailCard(int index, PiiEntityDetail item) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.slate50,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(item.type,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, color: AppTheme.slate900)),
+              ),
+              Text('#$index', style: const TextStyle(color: AppTheme.slate500)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              PrivLockBadge.source(item.source),
+              PrivLockBadge.decision(item.decision),
+              PrivLockBadge.severity(item.severity),
+              PrivLockBadge(
+                label: '${(item.confidence * 100).toInt()}% confidence',
+                variant: BadgeVariant.slate,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text('Policy: ${item.regulation}', style: AppTheme.bodySecondary),
         ],
       ),
     );
@@ -583,9 +639,14 @@ class ResultScreen extends StatelessWidget {
           spacing: 6,
           runSpacing: 6,
           children: [
-            PrivLockBadge(label: 'Regex: ${result.regexHits}', variant: BadgeVariant.success),
-            PrivLockBadge(label: 'NER: ${result.nerHits}', variant: BadgeVariant.purple),
-            PrivLockBadge(label: 'Hybrid: ${result.hybridHits}', variant: BadgeVariant.primary),
+            PrivLockBadge(
+                label: 'Regex: ${result.regexHits}',
+                variant: BadgeVariant.success),
+            PrivLockBadge(
+                label: 'NER: ${result.nerHits}', variant: BadgeVariant.purple),
+            PrivLockBadge(
+                label: 'Hybrid: ${result.hybridHits}',
+                variant: BadgeVariant.primary),
           ],
         ),
       ],
@@ -593,7 +654,8 @@ class ResultScreen extends StatelessWidget {
   }
 
   Widget _buildAvgConfidence(DetectionResult result) {
-    final confPercent = (result.averageConfidence * 100).clamp(0, 100).toDouble();
+    final confPercent =
+        (result.averageConfidence * 100).clamp(0, 100).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,7 +689,8 @@ class ResultScreen extends StatelessWidget {
             value: confPercent / 100,
             minHeight: 8,
             backgroundColor: AppTheme.slate100,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+            valueColor:
+                const AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
           ),
         ),
       ],
@@ -671,8 +734,7 @@ class ResultScreen extends StatelessWidget {
         final downloadBtn = ElevatedButton.icon(
           onPressed: () async {
             final messenger = ScaffoldMessenger.of(context);
-            final success =
-                await ApiService.downloadDocument(downloadFilename);
+            final success = await ApiService.downloadDocument(downloadFilename);
             messenger.showSnackBar(
               SnackBar(
                 content: Text(success
@@ -780,10 +842,11 @@ class _RedactedDocumentPreviewCardState
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Error loading preview: $e';
+        _error =
+            'Preview could not be loaded. Check your connection and try again.';
         _isLoading = false;
       });
     }
@@ -802,10 +865,10 @@ class _RedactedDocumentPreviewCardState
               success ? AppTheme.accentColor : AppTheme.dangerColor,
         ),
       );
-    } catch (e) {
+    } catch (_) {
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('Download error: $e'),
+        const SnackBar(
+          content: Text('Download failed. Please try again.'),
           backgroundColor: AppTheme.dangerColor,
         ),
       );
@@ -836,7 +899,8 @@ class _RedactedDocumentPreviewCardState
             children: [
               // Dialog Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
                     const Icon(Icons.shield_outlined,
@@ -1061,8 +1125,8 @@ class _RedactedDocumentPreviewCardState
                               label: const Text('Enlarge Preview'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: AppTheme.primaryColor,
-                                side: const BorderSide(
-                                    color: AppTheme.slate200),
+                                side:
+                                    const BorderSide(color: AppTheme.slate200),
                                 minimumSize: const Size(0, 40),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 10),
@@ -1119,7 +1183,8 @@ class _RedactedDocumentPreviewCardState
               height: 32,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
             ),
             SizedBox(height: 12),
@@ -1204,57 +1269,70 @@ class _RedactedDocumentPreviewCardState
             ),
           MouseRegion(
             cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => _openLightbox(context, bytes, widget.originalFilename),
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 450),
-                    decoration: BoxDecoration(
-                      color: AppTheme.slate50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.slate200),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.memory(
-                          bytes,
-                          fit: BoxFit.contain,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () =>
+                    _openLightbox(context, bytes, widget.originalFilename),
+                borderRadius: BorderRadius.circular(8),
+                focusColor: AppTheme.primaryColor.withValues(alpha: 0.20),
+                child: Semantics(
+                  label: 'Zoom preview',
+                  hint: 'Open an enlarged view of the redacted document.',
+                  button: true,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(maxHeight: 450),
+                        decoration: BoxDecoration(
+                          color: AppTheme.slate50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.slate200),
                         ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.65),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.fullscreen, color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            'Click to Zoom',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                        padding: const EdgeInsets.all(8),
+                        child: Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.memory(
+                              bytes,
+                              fit: BoxFit.contain,
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.fullscreen,
+                                  color: Colors.white, size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'Click to Zoom',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
