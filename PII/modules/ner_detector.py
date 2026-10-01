@@ -10,6 +10,7 @@ Includes contextual filtering to prevent document labels (DOB, PAN) and
 institutional headers (Government of India) from being false positives.
 """
 
+import time
 import logging
 import spacy
 import warnings
@@ -76,7 +77,9 @@ def detect_pii_ner(text):
     if not text or nlp is None:
         return []
 
+    _tner_start = time.perf_counter()
     doc = nlp(text)
+    _tner_infer = time.perf_counter()
     detections = []
 
     for ent in doc.ents:
@@ -127,7 +130,14 @@ def detect_pii_ner(text):
         })
 
     detections.sort(key=lambda x: x['start'])
+    _tner_end = time.perf_counter()
+    logger.info(
+        "PROFILE NER: text_chars=%d inference=%.3fs postprocess=%.3fs total=%.3fs entities_raw=%d kept=%d",
+        len(text), _tner_infer - _tner_start, _tner_end - _tner_infer,
+        _tner_end - _tner_start, len(doc.ents), len(detections)
+    )
     return detections
+
 
 
 def get_ner_model_info():

@@ -6,6 +6,7 @@ Extracts text and word-level bounding boxes for visual PII redaction.
 
 import os
 import sys
+import time
 import logging
 import cv2
 import numpy as np
@@ -78,18 +79,31 @@ def preprocess_cv2_image(img):
 
     Returns: (processed_binary_image, original_resized_bgr_image)
     """
+    _tp0 = time.perf_counter()
     height, width = img.shape[:2]
     if width < 1400:
         scale = 1400.0 / width
         img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _tp1 = time.perf_counter()
+
     denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+    _tp2 = time.perf_counter()
+
     thresh = cv2.adaptiveThreshold(
         denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
     )
     kernel = np.ones((1, 1), np.uint8)
     processed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+    _tp3 = time.perf_counter()
+
+    logger.info(
+        "PROFILE OCR_PREPROCESS: resize_gray=%.3fs denoise=%.3fs threshold=%.3fs "
+        "total=%.3fs out_w=%d out_h=%d",
+        _tp1 - _tp0, _tp2 - _tp1, _tp3 - _tp2, _tp3 - _tp0,
+        img.shape[1], img.shape[0]
+    )
     return processed, img
 
 
@@ -211,12 +225,21 @@ def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --ps
     Merges tokens, resolves overlaps favoring numeric clarity and higher confidence,
     and sorts words spatially into natural reading order.
     """
+    _tocr1_start = time.perf_counter()
     data1 = pytesseract.image_to_data(
         processed_img,
         config=custom_config,
         output_type=pytesseract.Output.DICT
     )
+    _tocr1_end = time.perf_counter()
     words, extracted_text = _parse_ocr_data(data1, processed_img, custom_config)
+    logger.info(
+        "PROFILE OCR_PASS1: psm=6 elapsed=%.3fs img_shape=%s raw_boxes=%d words_kept=%d",
+        _tocr1_end - _tocr1_start,
+        str(processed_img.shape if hasattr(processed_img, 'shape') else 'N/A'),
+        len(data1.get('text', [])),
+        len(words)
+    )
 
     # Pass 2: High-fidelity sparse pass on grayscale image
     if bgr_img is not None:
@@ -229,11 +252,13 @@ def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --ps
             else:
                 scan_img = gray
 
+            _tocr2_start = time.perf_counter()
             data2 = pytesseract.image_to_data(
                 scan_img,
                 config=r'--oem 3 --psm 11 -l eng',
                 output_type=pytesseract.Output.DICT
             )
+            _tocr2_end = time.perf_counter()
 
             pass2_words = []
             n_boxes = len(data2.get('text', []))
@@ -250,6 +275,13 @@ def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --ps
                         'w': int(data2['width'][i] / scale),
                         'h': int(data2['height'][i] / scale),
                     })
+
+            logger.info(
+                "PROFILE OCR_PASS2: psm=11 elapsed=%.3fs scale=%.1f scan_shape=%s raw_boxes=%d words_kept=%d",
+                _tocr2_end - _tocr2_start, scale,
+                str(scan_img.shape if hasattr(scan_img, 'shape') else 'N/A'),
+                n_boxes, len(pass2_words)
+            )
 
             for p2 in pass2_words:
                 x, y, w, h = p2['x'], p2['y'], p2['w'], p2['h']
@@ -273,6 +305,7 @@ def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --ps
     # Sort words spatially into reading order (bucketed y, x)
     words.sort(key=lambda item: (round(item.get('y', 0) / 20.0), item.get('x', 0)))
     return words, extracted_text
+
 
 
 def get_pdf_pages_data(file_path):

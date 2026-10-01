@@ -441,15 +441,18 @@ def process_document():
     filepath = os.path.join(uploads_dir, filename)
 
     start_proc_time = time.time()
-    # Diagnostic log: request-start — no filenames, OCR text, or PII values logged
+    # Stage-level profiling: high-resolution monotonic timer (no sensitive data logged)
+    _t0 = time.perf_counter()
     file_size_bytes = request.content_length or 0
     logger.info(
-        "process_document START: doc_type=%s action=%s mode=%s ext=%s size_bytes=%d guest=%s",
+        "PROFILE PROCESS_START: doc_type=%s action=%s mode=%s ext=%s size_bytes=%d guest=%s",
         doc_type, action, detection_mode, ext, file_size_bytes, is_guest
     )
 
     try:
         file.save(filepath)
+        _t_upload_save = time.perf_counter()
+        logger.info("PROFILE STAGE upload_save=%.3fs", _t_upload_save - _t0)
 
         ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
         redacted_filename = f"redacted_{filename}"
@@ -589,18 +592,36 @@ def process_document():
         else:
             # Single document (image or text) processing
             page_count = 1
-            # Step 1: Document Text & Bounding Box Extraction
+            # Step 1: Document Text & Bounding Box Extraction (OCR)
+            _t_ocr_start = time.perf_counter()
             text_result = get_full_text_and_boxes(filepath)
+            _t_ocr_end = time.perf_counter()
             extracted_text = text_result.get('text', '')
             word_boxes = text_result.get('words', [])
             original_image = text_result.get('original_image')
+            _ocr_img_h, _ocr_img_w = (original_image.shape[:2] if original_image is not None else (0, 0))
+            _ocr_word_count = len(word_boxes)
+            logger.info(
+                "PROFILE STAGE ocr_total=%.3fs words=%d img_w=%d img_h=%d text_chars=%d",
+                _t_ocr_end - _t_ocr_start, _ocr_word_count, _ocr_img_w, _ocr_img_h, len(extracted_text)
+            )
 
             # Step 2: Hybrid PII Detection (Regex + NER)
+            _t_hybrid_start = time.perf_counter()
             hybrid_result = detect_pii_hybrid(extracted_text)
+            _t_hybrid_end = time.perf_counter()
             pii_detections = hybrid_result.get('detections', [])
             detection_stats = hybrid_result.get('stats', {})
+            logger.info(
+                "PROFILE STAGE hybrid_detection=%.3fs regex=%d ner=%d merged=%d",
+                _t_hybrid_end - _t_hybrid_start,
+                detection_stats.get('regex_detections', 0),
+                detection_stats.get('ner_detections', 0),
+                len(pii_detections)
+            )
 
             # Step 3: RAG Decision Engine - Apply Policy Redaction Actions
+            _t_policy_start = time.perf_counter()
             try:
                 enriched_detections = decide_redaction(pii_detections)
                 rag_status = get_rag_engine().get_engine_status()
@@ -608,6 +629,13 @@ def process_document():
                 logger.warning("RAG policy decisioning warning: %s", e)
                 enriched_detections = pii_detections
                 rag_status = {'rag_enabled': False, 'error': str(e)}
+            _t_policy_end = time.perf_counter()
+            logger.info(
+                "PROFILE STAGE policy_decision=%.3fs engine=%s pii_enriched=%d",
+                _t_policy_end - _t_policy_start,
+                rag_status.get('embedding_model', 'unknown'),
+                len(enriched_detections)
+            )
 
             # Override decision if user explicitly requested specific action
             if action == 'mask':
@@ -634,6 +662,7 @@ def process_document():
                 active_detections = enriched_detections
                 active_manual_regions = None
 
+            _t_redact_start = time.perf_counter()
             redaction_results = process_redaction(
                 extracted_text,
                 original_image,
@@ -641,6 +670,11 @@ def process_document():
                 active_detections,
                 redacted_path,
                 manual_regions=active_manual_regions
+            )
+            _t_redact_end = time.perf_counter()
+            logger.info(
+                "PROFILE STAGE redaction=%.3fs detections=%d mode=%s",
+                _t_redact_end - _t_redact_start, len(active_detections), detection_mode
             )
 
         elapsed_time = round(time.time() - start_proc_time, 2)
