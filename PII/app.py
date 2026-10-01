@@ -441,6 +441,12 @@ def process_document():
     filepath = os.path.join(uploads_dir, filename)
 
     start_proc_time = time.time()
+    # Diagnostic log: request-start — no filenames, OCR text, or PII values logged
+    file_size_bytes = request.content_length or 0
+    logger.info(
+        "process_document START: doc_type=%s action=%s mode=%s ext=%s size_bytes=%d guest=%s",
+        doc_type, action, detection_mode, ext, file_size_bytes, is_guest
+    )
 
     try:
         file.save(filepath)
@@ -638,6 +644,13 @@ def process_document():
             )
 
         elapsed_time = round(time.time() - start_proc_time, 2)
+        # Diagnostic log: successful completion — no filenames, OCR text, or PII values logged
+        logger.info(
+            "process_document DONE: doc_type=%s action=%s mode=%s elapsed=%.2fs "
+            "pii_count=%d pages=%d guest=%s",
+            doc_type, action, detection_mode, elapsed_time,
+            len(pii_detections), page_count, is_guest
+        )
 
         # Extract PII types and non-sensitive summary
         pii_types = sorted(list({d.get('type', 'unknown') for d in enriched_detections}))
@@ -709,7 +722,15 @@ def process_document():
         return success_response('Document processed successfully with AI PII detection', response_data, 200)
 
     except Exception as e:
-        logger.error("Document processing error on '%s': %s", filename, e, exc_info=True)
+        elapsed_fail = round(time.time() - start_proc_time, 2)
+        # Diagnostic log: failure summary — exception class only, no PII values or filenames logged
+        logger.info(
+            "process_document FAIL: doc_type=%s action=%s mode=%s elapsed=%.2fs "
+            "error_type=%s guest=%s",
+            doc_type, action, detection_mode, elapsed_fail,
+            type(e).__name__, is_guest
+        )
+        logger.error("Document processing error: %s", e, exc_info=True)
         if user_id:
             log_audit(user_id, 'pii_document_processing_failed', f"Error on {file.filename}: {str(e)}", 'error')
         return error_response(f'Failed to process document: {str(e)}', 500)

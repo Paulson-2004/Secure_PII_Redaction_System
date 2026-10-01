@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -193,7 +194,17 @@ class ApiService {
       }
     }
 
-    final streamedResponse = await request.send();
+    late http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await request.send()
+          .timeout(const Duration(seconds: 90));
+    } on TimeoutException {
+      throw Exception(
+        'Processing timed out after 90 seconds. '
+        'The document may be complex or the server is under load. '
+        'Please try again in a moment.',
+      );
+    }
     final response = await http.Response.fromStream(streamedResponse);
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;

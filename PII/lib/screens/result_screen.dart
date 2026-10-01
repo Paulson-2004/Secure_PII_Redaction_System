@@ -74,13 +74,6 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
 
-                // ── Text Comparison (OCR Extracted vs Redacted) ─────────────
-                if (result.extractedTextPreview.isNotEmpty) ...[
-                  _buildTextComparisonCard(context, result),
-                  const SizedBox(height: 22),
-                ],
-
-
                 // ── Detected PII Details Table (From Report Fig 9.4) ─────────
                 _buildPiiDetailsTable(result),
                 const SizedBox(height: 22),
@@ -339,95 +332,6 @@ class ResultScreen extends StatelessWidget {
       },
     );
   }
-
-  // ── Text Comparison (Report Fig 9.4) ──────────────────────────────────────
-  Widget _buildTextComparisonCard(BuildContext context, DetectionResult result) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.slate200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.compare_arrows_outlined,
-                  size: 18, color: AppTheme.primaryColor),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Text Comparison & Extraction Preview',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.slate900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppTheme.slate50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.slate200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'EXTRACTED TEXT (OCR SAMPLE)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.slate500,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.copy_outlined, size: 14),
-                      tooltip: 'Copy text sample',
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: result.extractedTextPreview),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Copied OCR sample to clipboard'),
-                            backgroundColor: AppTheme.accentColor,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  result.extractedTextPreview,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    color: AppTheme.slate700,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
 
   // ── Detected PII Details Table (Report Fig 9.4) ───────────────────────────
   Widget _buildPiiDetailsTable(DetectionResult result) {
