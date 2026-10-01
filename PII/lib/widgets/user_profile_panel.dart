@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -5,6 +6,7 @@ import '../screens/account_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/settings_screen.dart';
+import '../theme/app_theme.dart';
 import 'change_password_dialog.dart';
 
 class UserProfilePanel extends StatelessWidget {
@@ -13,24 +15,26 @@ class UserProfilePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final panelWidth = math.min(280.0, screenWidth - 32);
 
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
       alignment: Alignment.topRight,
-      insetPadding: const EdgeInsets.only(top: 60, right: 12),
+      insetPadding: const EdgeInsets.only(top: 56, right: 16, left: 16),
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        elevation: 8,
-        shadowColor: Colors.black.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        elevation: 6,
+        shadowColor: Colors.black.withValues(alpha: 0.12),
         child: Container(
-          width: 340,
+          width: panelWidth,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: Colors.grey.shade200,
+              color: AppTheme.slate200,
               width: 1,
             ),
           ),
@@ -39,73 +43,76 @@ class UserProfilePanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ──────────────────────────────────────────
-              // PROFILE HEADER
+              // COMPACT IDENTITY HEADER
               // ──────────────────────────────────────────
               Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF1A73E8), Color(0xFF0D47A1)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
+                  color: AppTheme.slate50,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+                  border: Border(
+                      bottom: BorderSide(color: AppTheme.slate200, width: 1)),
                 ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    // Avatar
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: Colors.white, width: 2),
+                        color: AppTheme.primaryLight,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: const Color(0xFFBFDBFE), width: 1),
                       ),
                       child: Center(
                         child: auth.isGuest
                             ? const Icon(Icons.person_outline,
-                                size: 28, color: Colors.white)
+                                size: 20, color: AppTheme.primaryColor)
                             : Text(
                                 (auth.username.isNotEmpty
                                         ? auth.username[0]
                                         : 'U')
                                     .toUpperCase(),
                                 style: const TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppTheme.primaryColor,
                                 ),
                               ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    // Welcome message
-                    Text(
-                      auth.isGuest ? 'Guest Session' : 'Hi, ${auth.username}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            auth.isGuest ? 'Guest Session' : auth.username,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.slate900,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            auth.isGuest
+                                ? 'No account linked • Ephemeral'
+                                : (auth.email.isNotEmpty
+                                    ? auth.email
+                                    : 'Active Account'),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.slate500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    // Email or guest notice
-                    Text(
-                      auth.isGuest
-                          ? 'No account linked • Ephemeral mode'
-                          : auth.email,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -138,7 +145,11 @@ class UserProfilePanel extends StatelessWidget {
                     );
                   },
                 ),
-                const Divider(height: 1, indent: 0, endIndent: 0),
+                const Divider(
+                    height: 1,
+                    indent: 0,
+                    endIndent: 0,
+                    color: AppTheme.slate100),
                 _profileMenuItem(
                   icon: Icons.info_outline,
                   label: 'Why Create an Account?',
@@ -186,7 +197,11 @@ class UserProfilePanel extends StatelessWidget {
                     );
                   },
                 ),
-                const Divider(height: 1, indent: 0, endIndent: 0),
+                const Divider(
+                    height: 1,
+                    indent: 0,
+                    endIndent: 0,
+                    color: AppTheme.slate100),
                 _profileMenuItem(
                   icon: Icons.exit_to_app,
                   label: 'Exit Guest Mode',
@@ -232,7 +247,11 @@ class UserProfilePanel extends StatelessWidget {
                     ChangePasswordDialog.show(context);
                   },
                 ),
-                const Divider(height: 1, indent: 0, endIndent: 0),
+                const Divider(
+                    height: 1,
+                    indent: 0,
+                    endIndent: 0,
+                    color: AppTheme.slate100),
                 _profileMenuItem(
                   icon: Icons.logout,
                   label: 'Sign Out',
@@ -265,29 +284,29 @@ class UserProfilePanel extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        highlightColor: Colors.grey.shade100,
-        splashColor: Colors.grey.shade200,
+        hoverColor: isDestructive ? const Color(0xFFFEF2F2) : AppTheme.slate50,
+        splashColor: isDestructive ? const Color(0xFFFEE2E2) : AppTheme.slate100,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
               Icon(
                 icon,
-                size: 20,
-                color: isDestructive 
-                    ? Colors.red.shade600 
-                    : Colors.grey.shade700,
+                size: 18,
+                color: isDestructive
+                    ? AppTheme.dangerColor
+                    : AppTheme.slate600,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: isDestructive
-                        ? Colors.red.shade600
-                        : Colors.grey.shade900,
+                        ? AppTheme.dangerColor
+                        : AppTheme.slate800,
                   ),
                 ),
               ),

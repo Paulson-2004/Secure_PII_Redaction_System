@@ -13,32 +13,27 @@ class PipelineStepper extends StatelessWidget {
     },
     {
       'step': 'STEP 2',
-      'title': 'Regex Detection',
-      'subtitle': 'Aadhaar, PAN, DL, Phone',
-      'icon': 'pattern',
+      'title': 'PII Detection',
+      'subtitle': 'Regex + NER',
+      'detail': 'Indian PII patterns + contextual entities',
+      'icon': 'detection',
     },
     {
       'step': 'STEP 3',
-      'title': 'NER Recognition',
-      'subtitle': 'Names, Locations, Context',
-      'icon': 'ai',
-    },
-    {
-      'step': 'STEP 4',
       'title': 'Hybrid Fusion',
-      'subtitle': 'Dedup & Confidence Scoring',
+      'subtitle': 'Deduplication + confidence scoring',
       'icon': 'fusion',
     },
     {
-      'step': 'STEP 5',
-      'title': 'Policy Engine',
-      'subtitle': 'DPDP & UIDAI Compliance',
+      'step': 'STEP 4',
+      'title': 'Policy Decision',
+      'subtitle': 'Regulatory retrieval + decision',
       'icon': 'policy',
     },
     {
-      'step': 'STEP 6',
-      'title': 'Secure Redactor',
-      'subtitle': 'Dual Image & Text Masking',
+      'step': 'STEP 5',
+      'title': 'Secure Redaction',
+      'subtitle': 'Image + text masking',
       'icon': 'lock',
     },
   ];
@@ -47,10 +42,8 @@ class PipelineStepper extends StatelessWidget {
     switch (type) {
       case 'text':
         return Icons.document_scanner_outlined;
-      case 'pattern':
-        return Icons.code_rounded;
-      case 'ai':
-        return Icons.psychology_outlined;
+      case 'detection':
+        return Icons.manage_search_rounded;
       case 'fusion':
         return Icons.hub_outlined;
       case 'policy':
@@ -156,12 +149,14 @@ class PipelineStepper extends StatelessWidget {
                 runSpacing: 8,
                 children: List.generate(_steps.length, (index) {
                   final step = _steps[index];
-                  // On wide screen, width is fraction; on narrow, it wraps
-                  final double itemWidth = constraints.maxWidth > 900
-                      ? (constraints.maxWidth - (5 * 8)) / 6
+                  final columns = constraints.maxWidth > 900
+                      ? 5
                       : constraints.maxWidth > 600
-                          ? (constraints.maxWidth - (2 * 8)) / 3
-                          : constraints.maxWidth;
+                          ? 3
+                          : 1;
+                  final itemWidth = columns == 1
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - ((columns - 1) * 8)) / columns;
 
                   return Container(
                     width: itemWidth,
@@ -215,13 +210,23 @@ class PipelineStepper extends StatelessWidget {
                               ),
                               Text(
                                 step['subtitle']!,
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 10,
                                   color: AppTheme.slate500,
                                 ),
                               ),
+                              if (step['detail'] != null)
+                                Text(
+                                  step['detail']!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: AppTheme.slate500,
+                                  ),
+                                ),
                             ],
                           ),
                         ),

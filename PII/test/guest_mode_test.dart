@@ -83,15 +83,56 @@ void main() {
       expect(find.byType(DashboardScreen), findsOneWidget);
     });
 
-    testWidgets('UserProfilePanel adapts appropriately for Guest sessions',
+    testWidgets('UserProfilePanel adapts appropriately for Guest sessions across viewports',
+        (WidgetTester tester) async {
+      final auth = AuthProvider();
+      auth.continueAsGuest();
+
+      for (final width in [1440.0, 768.0, 390.0, 360.0]) {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1.0;
+
+        await tester.pumpWidget(
+          buildTestApp(
+            authProvider: auth,
+            size: Size(width, 900),
+            child: const Center(child: UserProfilePanel()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Guest Session'), findsOneWidget, reason: 'Guest header at $width');
+        expect(find.text('No account linked • Ephemeral'), findsOneWidget, reason: 'Guest subtitle at $width');
+        expect(find.text('Sign In to Account'), findsOneWidget, reason: 'Sign in at $width');
+        expect(find.text('Create Free Account'), findsOneWidget, reason: 'Create account at $width');
+        expect(find.text('Why Create an Account?'), findsOneWidget, reason: 'Why create at $width');
+        expect(find.text('Exit Guest Mode'), findsOneWidget, reason: 'Exit guest at $width');
+
+        // Verify authenticated-only options are hidden
+        expect(find.text('Manage Account'), findsNothing);
+        expect(find.text('Change Password'), findsNothing);
+        expect(tester.takeException(), isNull, reason: 'No overflow at $width');
+      }
+
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+    });
+
+    testWidgets('UserProfilePanel displays authenticated options when user is signed in',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1400, 1000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      SharedPreferences.setMockInitialValues({
+        'isLoggedIn': true,
+        'username': 'SecurityAnalyst',
+        'email': 'analyst@company.com',
+      });
+
       final auth = AuthProvider();
-      auth.continueAsGuest();
+      await auth.initialize();
 
       await tester.pumpWidget(
         buildTestApp(
@@ -101,15 +142,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Guest Session'), findsOneWidget);
-      expect(find.text('Sign In to Account'), findsOneWidget);
-      expect(find.text('Create Free Account'), findsOneWidget);
-      expect(find.text('Exit Guest Mode'), findsOneWidget);
-      expect(find.text('Why Create an Account?'), findsOneWidget);
+      expect(find.text('SecurityAnalyst'), findsOneWidget);
+      expect(find.text('analyst@company.com'), findsOneWidget);
+      expect(find.text('Manage Account'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Change Password'), findsOneWidget);
+      expect(find.text('Sign Out'), findsOneWidget);
 
-      // Verify authenticated-only options are hidden
-      expect(find.text('Manage Account'), findsNothing);
-      expect(find.text('Change Password'), findsNothing);
+      // Verify guest-only options are hidden
+      expect(find.text('Guest Session'), findsNothing);
+      expect(find.text('Sign In to Account'), findsNothing);
+      expect(find.text('Create Free Account'), findsNothing);
+      expect(find.text('Exit Guest Mode'), findsNothing);
     });
 
     testWidgets('AppDrawer displays Guest User banner and intercepts Redaction History',

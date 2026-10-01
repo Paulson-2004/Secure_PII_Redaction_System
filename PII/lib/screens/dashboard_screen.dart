@@ -637,8 +637,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final screenWidth = MediaQuery.of(context).size.width;
-    final bool isDesktop = screenWidth >= 1024;
+    final screenWidth = MediaQuery.sizeOf(context).width;
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -814,42 +813,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── Main Responsive Workspace ───────────────────────────────
-                if (isDesktop)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 7,
-                        child: _buildUploadStudioCard(),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        flex: 5,
-                        child: Column(
-                          children: [
-                            _buildRecentActivityCard(),
-                            const SizedBox(height: 20),
-                            _buildSystemHealthCard(),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  Column(
-                    children: [
-                      _buildUploadStudioCard(),
-                      const SizedBox(height: 20),
-                      _buildRecentActivityCard(),
-                      const SizedBox(height: 20),
-                      _buildSystemHealthCard(),
-                    ],
-                  ),
-
-                const SizedBox(height: 22),
-                // Secondary capability details follow the primary workflow.
+                // ── AI Modules Status Row ───────────────────────────────────
                 _buildAiModulesRow(),
+
+                const SizedBox(height: 24),
+
+                // ── Main Responsive Workspace ───────────────────────────────
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool useTwoColumn = constraints.maxWidth >= 960;
+                    if (useTwoColumn) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 7,
+                            child: _buildUploadStudioCard(),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildRecentActivityCard(),
+                                const SizedBox(height: 20),
+                                _buildSystemHealthCard(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildUploadStudioCard(),
+                        const SizedBox(height: 20),
+                        _buildRecentActivityCard(),
+                        const SizedBox(height: 20),
+                        _buildSystemHealthCard(),
+                      ],
+                    );
+                  },
+                ),
 
                 const SizedBox(height: 28),
 
@@ -1022,7 +1029,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildUploadStudioCard() {
     return Container(
       key: _uploadStudioKey,
-      padding: const EdgeInsets.all(20),
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -1057,26 +1065,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           const Text(
             'Select document classification, choose privacy policy, and process files through the hybrid engine.',
             style: TextStyle(fontSize: 12, color: AppTheme.slate500),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
 
           // ── Step 1: Document Type ──
           _stepHeader('1', 'Select Document Type'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: _docTypes.map((dt) {
               final isSelected = dt['value'] == _selectedDocType;
               return ChoiceChip(
                 showCheckmark: false,
                 avatar: Icon(
                   dt['icon'] as IconData,
-                  size: 15,
+                  size: 14,
                   color: isSelected ? Colors.white : AppTheme.slate600,
                 ),
                 label: Text(dt['label'] as String),
@@ -1087,7 +1095,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: isSelected ? AppTheme.primaryColor : AppTheme.slate200,
                 ),
                 labelStyle: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   color: isSelected ? Colors.white : AppTheme.slate800,
                 ),
@@ -1100,20 +1108,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }).toList(),
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
 
           // ── Step 2: Redaction Action ──
           _stepHeader('2', 'Choose Redaction Policy Action'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           LayoutBuilder(
             builder: (context, constraints) {
               return Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 8,
+                runSpacing: 8,
                 children: _actions.map((act) {
                   final isSelected = act['value'] == _selectedAction;
                   final double width = constraints.maxWidth > 550
-                      ? (constraints.maxWidth - (2 * 10)) / 3
+                      ? (constraints.maxWidth - (2 * 8)) / 3
                       : constraints.maxWidth;
 
                   return InkWell(
@@ -1122,7 +1130,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       width: width,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppTheme.primaryLight
@@ -1142,7 +1151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               Icon(
                                 act['icon'] as IconData,
-                                size: 18,
+                                size: 16,
                                 color: isSelected
                                     ? AppTheme.primaryColor
                                     : AppTheme.slate600,
@@ -1152,7 +1161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: Text(
                                   act['label'] as String,
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                     color: isSelected
                                         ? AppTheme.primaryColor
@@ -1162,18 +1171,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               if (isSelected)
                                 const Icon(Icons.check_circle,
-                                    size: 16, color: AppTheme.primaryColor),
+                                    size: 15, color: AppTheme.primaryColor),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             act['description'] as String,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10.5,
                               color: isSelected
                                   ? const Color(0xFF1D4ED8)
                                   : AppTheme.slate500,
-                              height: 1.3,
+                              height: 1.25,
                             ),
                           ),
                         ],
@@ -1185,11 +1194,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
 
           // ── Step 3: Document Upload Dropzone ──
           _stepHeader('3', 'Select or Drop Document'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           if (_selectedFile != null || _selectedFileBytes != null)
             _FilePreviewCard(
               file: _selectedFile,
@@ -1200,21 +1209,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           else
             _UploadPlaceholder(onTap: _showFileSourceSheet),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
 
           // ── Step 4: Redaction & Detection Mode ──
           _stepHeader('4', 'Select Detection & Redaction Mode'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildDetectionModeSelector(),
 
           if (_selectedDetectionMode != 'automatic') ...[
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
             _stepHeader('5', 'Interactive Manual Selection Studio'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _buildManualSelectionStudio(),
           ],
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
 
           // ── Process Document Action ──
           _buildProcessButtonSection(),
@@ -1227,12 +1236,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 8,
+          runSpacing: 8,
           children: _detectionModes.map((dm) {
             final isSelected = dm['value'] == _selectedDetectionMode;
             final double width = constraints.maxWidth > 550
-                ? (constraints.maxWidth - (2 * 10)) / 3
+                ? (constraints.maxWidth - (2 * 8)) / 3
                 : constraints.maxWidth;
 
             return InkWell(
@@ -1241,7 +1250,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 width: width,
-                padding: const EdgeInsets.all(12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected ? AppTheme.primaryLight : AppTheme.slate50,
                   borderRadius: BorderRadius.circular(10),
@@ -1258,7 +1268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Icon(
                           dm['icon'] as IconData,
-                          size: 18,
+                          size: 16,
                           color: isSelected
                               ? AppTheme.primaryColor
                               : AppTheme.slate600,
@@ -1268,7 +1278,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Text(
                             dm['label'] as String,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: isSelected
                                   ? AppTheme.primaryColor
@@ -1278,18 +1288,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         if (isSelected)
                           const Icon(Icons.check_circle,
-                              size: 16, color: AppTheme.primaryColor),
+                              size: 15, color: AppTheme.primaryColor),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       dm['description'] as String,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         color: isSelected
                             ? const Color(0xFF1D4ED8)
                             : AppTheme.slate500,
-                        height: 1.3,
+                        height: 1.25,
                       ),
                     ),
                   ],
@@ -1954,7 +1964,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 46,
               child: ElevatedButton.icon(
                 onPressed: canProcess ? _processDocument : null,
                 icon: docProvider.isProcessing
@@ -1970,7 +1980,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: Text(
                   buttonLabel,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -2026,6 +2036,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ── Recent Activity Card ──────────────────────────────────────────────────
   Widget _buildRecentActivityCard() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2325,11 +2336,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : (dbOnline ? AppTheme.accentColor : AppTheme.dangerColor);
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2425,15 +2444,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 8),
           _healthRow(
-            'Policy Corpus',
-            'ACTIVE CORPUS',
-            AppTheme.primaryColor,
+            'Hybrid AI Pipeline',
+            apiOnline ? 'ACTIVE (OCR + NLP)' : 'UNAVAILABLE',
+            apiOnline ? AppTheme.accentColor : AppTheme.dangerColor,
           ),
           const SizedBox(height: 8),
           _healthRow(
-            'Corpus Scope',
-            'Legislation, Standards & Mappings',
-            const Color(0xFF6D28D9),
+            'Policy Decision Engine',
+            apiOnline ? 'ACTIVE (Vector Corpus)' : 'UNAVAILABLE',
+            apiOnline ? AppTheme.primaryColor : AppTheme.dangerColor,
+          ),
+          const SizedBox(height: 8),
+          _healthRow(
+            'Redaction Engine',
+            apiOnline ? 'READY (Dual Masking)' : 'UNAVAILABLE',
+            apiOnline ? const Color(0xFF6D28D9) : AppTheme.dangerColor,
           ),
         ],
       ),
@@ -2535,7 +2560,7 @@ class _UploadPlaceholder extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
           color: AppTheme.slate50,
           borderRadius: BorderRadius.circular(10),
@@ -2548,41 +2573,41 @@ class _UploadPlaceholder extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: AppTheme.primaryLight,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(19),
               ),
               child: const Icon(
                 Icons.cloud_upload_outlined,
                 color: AppTheme.primaryColor,
-                size: 24,
+                size: 20,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             const Text(
               'Click to upload or drag & drop document',
               style: TextStyle(
                 color: AppTheme.slate900,
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             const Text(
               'Supported Formats: PDF, PNG, JPG, WEBP, DOCX, TXT • Max 16 MB',
               style: TextStyle(color: AppTheme.slate500, fontSize: 11),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: onTap,
               icon: const Icon(Icons.add, size: 14),
               label: const Text('Browse Files'),
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 32),
+                minimumSize: const Size(0, 30),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                 side: const BorderSide(color: AppTheme.primaryColor),
                 foregroundColor: AppTheme.primaryColor,
               ),
