@@ -168,7 +168,7 @@ def _parse_ocr_data(data, processed_img, custom_config):
     return words, extracted_text
 
 
-def get_full_text_and_boxes(file_path):
+def get_full_text_and_boxes(file_path, detection_fn=None):
     """
     Extract full text and word-level bounding boxes in a single optimized pass.
 
@@ -204,18 +204,22 @@ def get_full_text_and_boxes(file_path):
     processed_img, original_img = preprocess_image(file_path)
     custom_config = r'--oem 3 --psm 6 -l eng'
 
-    words, extracted_text = _extract_words_and_text(processed_img, original_img, custom_config)
+    words, extracted_text, detection_result, detection_elapsed = _extract_words_and_text(
+        processed_img, original_img, custom_config, detection_fn=detection_fn
+    )
 
     return {
         'text': extracted_text,
         'words': words,
         'original_image': original_img,
         'processed_image': processed_img,
-        'is_text_file': False
+        'is_text_file': False,
+        'detection_result': detection_result,
+        'detection_elapsed': detection_elapsed,
     }
 
 
-def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --psm 6 -l eng'):
+def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --psm 6 -l eng', detection_fn=None):
     """
     Multi-pass OCR extraction:
     Pass 1: Standard structured layout extraction with PSM 6.
@@ -241,8 +245,41 @@ def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --ps
         len(words)
     )
 
+    detection_elapsed = 0.0
+    if detection_fn is not None:
+        _tdetect_start = time.perf_counter()
+        detection_result = detection_fn(extracted_text)
+        detection_elapsed = time.perf_counter() - _tdetect_start
+    else:
+        detection_result = None
+    avg_confidence = (
+        sum(word['confidence'] for word in words) / len(words) if words else 0.0
+    )
+    pass2_enabled = bgr_img is not None
+    if detection_fn is not None:
+        pii_count = len((detection_result or {}).get('detections', []))
+        p1_word_count = len(words)
+        enough_words = p1_word_count >= 15
+        has_pii = pii_count >= 1
+        high_confidence = avg_confidence >= 0.65
+        skip_pass2 = enough_words and (has_pii or high_confidence)
+        pass2_enabled = not skip_pass2
+        if skip_pass2:
+            reason = 'sufficient_words_with_pii' if has_pii else 'sufficient_words_high_confidence'
+        elif not enough_words:
+            reason = 'insufficient_words'
+        elif not high_confidence:
+            reason = 'low_confidence_without_pii'
+        else:
+            reason = 'insufficient_pass1_quality'
+        logger.info(
+            'OCR_DECISION: p1_words=%d avg_conf=%.3f pii_entities=%d pass2=%s reason=%s',
+            p1_word_count, avg_confidence, pii_count,
+            'fallback' if pass2_enabled else 'skipped', reason
+        )
+
     # Pass 2: High-fidelity sparse pass on grayscale image
-    if bgr_img is not None:
+    if pass2_enabled:
         try:
             gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
             h, w = gray.shape[:2]
@@ -304,11 +341,11 @@ def _extract_words_and_text(processed_img, bgr_img, custom_config=r'--oem 3 --ps
 
     # Sort words spatially into reading order (bucketed y, x)
     words.sort(key=lambda item: (round(item.get('y', 0) / 20.0), item.get('x', 0)))
-    return words, extracted_text
+    return words, extracted_text, detection_result, detection_elapsed
 
 
 
-def get_pdf_pages_data(file_path):
+def get_pdf_pages_data(file_path, detection_fn=None):
     """
     Extract images, text, and bounding boxes for all pages of a PDF document.
 
@@ -345,14 +382,18 @@ def get_pdf_pages_data(file_path):
 
         processed_img, resized_bgr = preprocess_cv2_image(bgr_img)
 
-        words, page_text = _extract_words_and_text(processed_img, resized_bgr, custom_config)
+        words, page_text, detection_result, detection_elapsed = _extract_words_and_text(
+            processed_img, resized_bgr, custom_config, detection_fn=detection_fn
+        )
 
         pages.append({
             'page_num': page_idx,
             'original_image': resized_bgr,
             'processed_image': processed_img,
             'text': page_text,
-            'words': words
+            'words': words,
+            'detection_result': detection_result,
+            'detection_elapsed': detection_elapsed,
         })
 
     doc.close()

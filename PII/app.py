@@ -461,7 +461,7 @@ def process_document():
         if ext == 'pdf':
             # Multi-page PDF Processing Pipeline:
             # Process each page sequentially through OCR, detection, policy engine, and redaction
-            pages_data = get_pdf_pages_data(filepath)
+            pages_data = get_pdf_pages_data(filepath, detection_fn=detect_pii_hybrid)
             page_count = len(pages_data)
 
             all_enriched_detections = []
@@ -493,7 +493,9 @@ def process_document():
                 page_manual_regions = [r for r in manual_regions if r.get('page') == page_idx + 1]
 
                 # Hybrid PII Detection on page text
-                p_hybrid = detect_pii_hybrid(p_text)
+                p_hybrid = page.get('detection_result')
+                if p_hybrid is None:
+                    p_hybrid = detect_pii_hybrid(p_text)
                 p_detections = p_hybrid.get('detections', [])
                 p_stats = p_hybrid.get('stats', {})
 
@@ -594,27 +596,37 @@ def process_document():
             page_count = 1
             # Step 1: Document Text & Bounding Box Extraction (OCR)
             _t_ocr_start = time.perf_counter()
-            text_result = get_full_text_and_boxes(filepath)
+            text_result = get_full_text_and_boxes(
+                filepath,
+                detection_fn=detect_pii_hybrid if ext != 'txt' else None
+            )
             _t_ocr_end = time.perf_counter()
             extracted_text = text_result.get('text', '')
             word_boxes = text_result.get('words', [])
             original_image = text_result.get('original_image')
+            detection_elapsed = text_result.get('detection_elapsed', 0.0)
             _ocr_img_h, _ocr_img_w = (original_image.shape[:2] if original_image is not None else (0, 0))
             _ocr_word_count = len(word_boxes)
             logger.info(
                 "PROFILE STAGE ocr_total=%.3fs words=%d img_w=%d img_h=%d text_chars=%d",
-                _t_ocr_end - _t_ocr_start, _ocr_word_count, _ocr_img_w, _ocr_img_h, len(extracted_text)
+                max(0.0, _t_ocr_end - _t_ocr_start - detection_elapsed),
+                _ocr_word_count, _ocr_img_w, _ocr_img_h, len(extracted_text)
             )
 
             # Step 2: Hybrid PII Detection (Regex + NER)
             _t_hybrid_start = time.perf_counter()
-            hybrid_result = detect_pii_hybrid(extracted_text)
-            _t_hybrid_end = time.perf_counter()
+            hybrid_result = text_result.get('detection_result')
+            if hybrid_result is None:
+                hybrid_result = detect_pii_hybrid(extracted_text)
+                _t_hybrid_end = time.perf_counter()
+                hybrid_elapsed = _t_hybrid_end - _t_hybrid_start
+            else:
+                hybrid_elapsed = detection_elapsed
             pii_detections = hybrid_result.get('detections', [])
             detection_stats = hybrid_result.get('stats', {})
             logger.info(
                 "PROFILE STAGE hybrid_detection=%.3fs regex=%d ner=%d merged=%d",
-                _t_hybrid_end - _t_hybrid_start,
+                hybrid_elapsed,
                 detection_stats.get('regex_detections', 0),
                 detection_stats.get('ner_detections', 0),
                 len(pii_detections)
