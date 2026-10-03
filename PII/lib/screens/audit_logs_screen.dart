@@ -5,6 +5,7 @@ import '../providers/document_provider.dart';
 import '../models/audit_log.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/backend_waking_hint.dart';
 import '../widgets/privlock_badge.dart';
 import '../widgets/privlock_metric_card.dart';
 import 'login_screen.dart';
@@ -159,25 +160,36 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
       body: Consumer<DocumentProvider>(
         builder: (context, provider, _) {
           if (provider.isLoadingLogs) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.primaryColor),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Loading compliance audit logs...',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.slate500,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      DelayedBackendWakingHint(
+                        isWaiting: provider.isLoadingLogs,
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 14),
-                  Text(
-                    'Loading compliance audit logs...',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.slate500,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           }

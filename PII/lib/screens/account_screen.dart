@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/document_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/backend_waking_hint.dart';
 import '../widgets/change_password_dialog.dart';
 import '../widgets/privlock_badge.dart';
 import '../widgets/privlock_metric_card.dart';
@@ -87,7 +88,11 @@ class _AccountScreenState extends State<AccountScreen> {
                 const SizedBox(height: 20),
 
                 // ── Compliance & Data Governance Card ───────────────────────
-                _buildComplianceInfoCard(context, docProvider.auditLogs.length),
+                _buildComplianceInfoCard(
+                  context,
+                  docProvider.auditLogs.length,
+                  isLoadingHistory: docProvider.isLoadingLogs,
+                ),
                 const SizedBox(height: 20),
 
                 // ── Danger Zone / Sign Out ──────────────────────────────────
@@ -452,7 +457,11 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   // ── Compliance & Data Governance Card ─────────────────────────────────────
-  Widget _buildComplianceInfoCard(BuildContext context, int totalLogs) {
+  Widget _buildComplianceInfoCard(
+    BuildContext context,
+    int totalLogs, {
+    bool isLoadingHistory = false,
+  }) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -529,6 +538,9 @@ class _AccountScreenState extends State<AccountScreen> {
               height: 1.4,
             ),
           ),
+          // Delayed cold-start hint while history is still loading
+          // (Render wake-up). Existing content stays untouched.
+          DelayedBackendWakingHint(isWaiting: isLoadingHistory),
         ],
       ),
     );

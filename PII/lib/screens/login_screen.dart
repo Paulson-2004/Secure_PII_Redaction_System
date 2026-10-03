@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/backend_waking_hint.dart';
 import 'dashboard_screen.dart';
 import 'register_screen.dart';
 
@@ -188,6 +189,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                         )
                                       : const Text('Sign In'),
                                 ),
+                              ),
+                            ),
+                            // Delayed cold-start hint: only appears if the
+                            // login request stays unresolved past the
+                            // threshold (Render free-tier wake-up). Never
+                            // shown for fast responses; original request
+                            // continues untouched.
+                            Consumer<AuthProvider>(
+                              builder: (_, auth, __) =>
+                                  DelayedBackendWakingHint(
+                                isWaiting: auth.isLoading,
                               ),
                             ),
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/backend_waking_hint.dart';
 import 'pin_fingerprint_setup_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -183,6 +184,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         color: Colors.white, strokeWidth: 2),
                                   )
                                 : const Text('Create Account'),
+                          ),
+                        ),
+                        Consumer<AuthProvider>(
+                          builder: (_, auth, __) => DelayedBackendWakingHint(
+                            isWaiting: auth.isLoading,
                           ),
                         ),
                         const SizedBox(height: 20),

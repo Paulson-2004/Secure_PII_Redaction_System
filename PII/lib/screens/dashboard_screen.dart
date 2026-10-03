@@ -15,6 +15,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/external_launcher.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/backend_waking_hint.dart';
 import '../widgets/pipeline_stepper.dart';
 import '../widgets/privlock_badge.dart';
 import '../widgets/user_avatar_button.dart';
@@ -2026,6 +2027,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
+              // Delayed cold-start hint: existing progress stays visible;
+              // this appears only if processing is still unresolved after
+              // the threshold (Render wake-up). Request is never cancelled.
+              DelayedBackendWakingHint(
+                isWaiting: docProvider.isProcessing,
+              ),
             ],
           ],
         );
@@ -2145,10 +2152,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               final logs = docProvider.auditLogs;
               if (docProvider.isLoadingLogs && logs.isEmpty) {
-                return const Center(
+                return Center(
                   child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(strokeWidth: 2),
+                        DelayedBackendWakingHint(
+                          isWaiting: docProvider.isLoadingLogs,
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
@@ -2460,6 +2475,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             apiOnline ? 'READY (Dual Masking)' : 'UNAVAILABLE',
             apiOnline ? const Color(0xFF6D28D9) : AppTheme.dangerColor,
           ),
+          // Delayed cold-start hint: keeps the existing "Checking..."
+          // state for the first seconds; only if the health check is
+          // still unresolved (Render wake-up) does the hint appear.
+          // Removed automatically on connected/disconnected.
+          DelayedBackendWakingHint(isWaiting: isChecking),
         ],
       ),
     );

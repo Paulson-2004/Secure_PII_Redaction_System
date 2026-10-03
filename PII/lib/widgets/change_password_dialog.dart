@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'backend_waking_hint.dart';
 
 class ChangePasswordDialog extends StatefulWidget {
   const ChangePasswordDialog({super.key});
@@ -156,6 +157,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                   ),
                   validator: (v) => (v == null || v.isEmpty) ? 'Confirm new password' : null,
                 ),
+                DelayedBackendWakingHint(isWaiting: _isLoading),
               ],
             ),
           ),
